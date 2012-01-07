@@ -82,7 +82,7 @@ namespace NHttp
                     content = reader.ReadToEnd();
                 }
 
-                Client._postParameters = HttpUtil.UrlDecode(content);
+                Client.PostParameters = HttpUtil.UrlDecode(content);
             }
         }
 	}

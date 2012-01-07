@@ -21,11 +21,6 @@ namespace NHttp
         private NetworkStream _stream;
         private ClientState _state;
         private StringBuilder _lineBuffer;
-        private string _method;
-        private string _protocol;
-        private string _request;
-        private Dictionary<string, string> _headers;
-        private Dictionary<string, string> _postParameters;
         private MemoryStream _writeStream;
         private RequestParser _parser;
         private HttpContext _context;
@@ -33,6 +28,16 @@ namespace NHttp
         public HttpServer Server { get; private set; }
 
         public TcpClient TcpClient { get; private set; }
+
+        public string Method { get; private set; }
+
+        public string Protocol { get; private set; }
+
+        public string Request { get; private set; }
+
+        public Dictionary<string, string> Headers { get; private set; }
+
+        public Dictionary<string, string> PostParameters { get; private set; }
 
         public HttpClient(HttpServer server, TcpClient client)
         {
@@ -54,11 +59,6 @@ namespace NHttp
         {
             _state = ClientState.ReadingProlog;
             _lineBuffer = null;
-            _method = null;
-            _protocol = null;
-            _request = null;
-            _headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            _postParameters = null;
             _parser = null;
             _context = null;
 
@@ -67,6 +67,12 @@ namespace NHttp
                 _writeStream.Dispose();
                 _writeStream = null;
             }
+
+            Method = null;
+            Protocol = null;
+            Request = null;
+            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            PostParameters = null;
         }
 
         public void BeginRequest()
@@ -164,9 +170,9 @@ namespace NHttp
                 return;
             }
 
-            _method = match.Groups[1].Value;
-            _request = match.Groups[2].Value;
-            _protocol = match.Groups[3].Value;
+            Method = match.Groups[1].Value;
+            Request = match.Groups[2].Value;
+            Protocol = match.Groups[3].Value;
 
             // Continue reading the headers.
 
@@ -202,7 +208,7 @@ namespace NHttp
                 }
                 else
                 {
-                    _headers[parts[0].Trim()] = parts[1].Trim();
+                    Headers[parts[0].Trim()] = parts[1].Trim();
 
                     // Continue reading the next header.
 
@@ -236,11 +242,11 @@ namespace NHttp
 
             string expectHeader;
 
-            if (_headers.TryGetValue("Expect", out expectHeader))
+            if (Headers.TryGetValue("Expect", out expectHeader))
             {
                 // Remove the expect header for the next run.
 
-                _headers.Remove("Expect");
+                Headers.Remove("Expect");
 
                 int pos = expectHeader.IndexOf(';');
 
@@ -268,7 +274,7 @@ namespace NHttp
 
             string contentLengthHeader;
 
-            if (_headers.TryGetValue("Content-Length", out contentLengthHeader))
+            if (Headers.TryGetValue("Content-Length", out contentLengthHeader))
             {
                 int contentLength;
 
@@ -282,7 +288,7 @@ namespace NHttp
 
                 string contentTypeHeader;
 
-                if (!_headers.TryGetValue("Content-Type", out contentTypeHeader))
+                if (!Headers.TryGetValue("Content-Type", out contentTypeHeader))
                 {
                     Log.Warn("Expected Content-Type header with Content-Length header");
 
@@ -317,7 +323,7 @@ namespace NHttp
         {
             var sb = new StringBuilder();
 
-            sb.Append(_protocol);
+            sb.Append(Protocol);
             sb.Append(" 100 Continue\r\nServer: ");
             sb.Append(Server.ServerBanner);
             sb.Append("\r\nDate: ");
@@ -426,7 +432,7 @@ namespace NHttp
 
         private void ExecuteRequest()
         {
-            _context = new HttpContext(this, _protocol, _method, _request, _headers, _postParameters);
+            _context = new HttpContext(this);
 
             Log.Debug(String.Format("Accepted request '{0}'", _context.Request.RawUrl));
 
@@ -456,7 +462,7 @@ namespace NHttp
 
             // Write the prolog.
 
-            sb.Append(_protocol);
+            sb.Append(Protocol);
             sb.Append(' ');
             sb.Append(response.StatusCode);
 
@@ -530,7 +536,7 @@ namespace NHttp
             string connectionHeader;
 
             if (
-                _headers.TryGetValue("Connection", out connectionHeader) &&
+                Headers.TryGetValue("Connection", out connectionHeader) &&
                 String.Equals(connectionHeader, "keep-alive", StringComparison.OrdinalIgnoreCase)
             )
                 BeginRequest();

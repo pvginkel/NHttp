@@ -6,10 +6,10 @@ namespace NHttp
 {
     public class HttpContext
     {
-        internal HttpContext(HttpClient client, string protocol, string method, string request, Dictionary<string, string> headers, Dictionary<string, string> postParameters)
+        internal HttpContext(HttpClient client)
         {
             Server = client.Server.ServerUtility;
-            Request = new HttpRequest(client, protocol, method, request, headers, postParameters);
+            Request = new HttpRequest(client);
             Response = new HttpResponse(this);
         }
 

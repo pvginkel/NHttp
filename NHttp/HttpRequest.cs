@@ -4,7 +4,6 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace NHttp
 {
@@ -52,34 +51,34 @@ namespace NHttp
 
         public string[] UserLanguages { get; private set; }
 
-        internal HttpRequest(HttpClient client, string protocol, string method, string request, Dictionary<string, string> headers, Dictionary<string, string> postParameters)
+        internal HttpRequest(HttpClient client)
         {
-            ParseHeaders(headers);
+            ParseHeaders(client);
 
             Files = new HttpFileCollection();
 
-            Form = CreateCollection(postParameters);
+            Form = CreateCollection(client.PostParameters);
 
-            HttpMethod = RequestType = method;
+            HttpMethod = RequestType = client.Method;
 
-            ParsePath(client, request, headers);
+            ParsePath(client);
 
             ParseRemoteEndPoint(client);
 
-            BuildServerVariables(client, headers, request, protocol);
+            BuildServerVariables(client);
 
             BuildParams();
         }
 
-        private void ParseHeaders(Dictionary<string, string> headers)
+        private void ParseHeaders(HttpClient client)
         {
-            Headers = CreateCollection(headers);
+            Headers = CreateCollection(client.Headers);
 
             string header;
 
             // Parse Accept.
 
-            if (headers.TryGetValue("Accept", out header))
+            if (client.Headers.TryGetValue("Accept", out header))
             {
                 string[] parts = header.Split(',');
 
@@ -97,7 +96,7 @@ namespace NHttp
 
             // Parse Content-Type.
 
-            if (headers.TryGetValue("Content-Type", out header))
+            if (client.Headers.TryGetValue("Content-Type", out header))
             {
                 string[] parts = header.Split(new[] { ';' }, 2);
 
@@ -116,7 +115,7 @@ namespace NHttp
 
             // Parse Content-Length.
 
-            if (headers.TryGetValue("Content-Length", out header))
+            if (client.Headers.TryGetValue("Content-Length", out header))
             {
                 int contentLength;
 
@@ -126,17 +125,17 @@ namespace NHttp
 
             // Parse Referer.
 
-            if (headers.TryGetValue("Referer", out header))
+            if (client.Headers.TryGetValue("Referer", out header))
                 UrlReferer = new Uri(header);
 
             // Parse User-Agent.
 
-            if (headers.TryGetValue("User-Agent", out header))
+            if (client.Headers.TryGetValue("User-Agent", out header))
                 UserAgent = header;
 
             // Parse Accept-Language.
 
-            if (headers.TryGetValue("Accept-Language", out header))
+            if (client.Headers.TryGetValue("Accept-Language", out header))
             {
                 string[] parts = header.Split(',');
 
@@ -153,11 +152,11 @@ namespace NHttp
             }
         }
 
-        private void ParsePath(HttpClient client, string request, Dictionary<string, string> headers)
+        private void ParsePath(HttpClient client)
         {
-            RawUrl = request;
+            RawUrl = client.Request;
 
-            string[] parts = request.Split(new[] { '?' }, 2);
+            string[] parts = client.Request.Split(new[] { '?' }, 2);
 
             Path = parts[0];
 
@@ -170,7 +169,7 @@ namespace NHttp
             string port;
             string hostHeader;
 
-            if (headers.TryGetValue("Host", out hostHeader))
+            if (client.Headers.TryGetValue("Host", out hostHeader))
             {
                 parts = hostHeader.Split(new[] { ':' }, 2);
 
@@ -204,7 +203,7 @@ namespace NHttp
                 sb.Append(port);
             }
 
-            sb.Append(request);
+            sb.Append(client.Request);
 
             Url = new Uri(sb.ToString());
         }
@@ -216,7 +215,7 @@ namespace NHttp
             UserHostName = UserHostAddress = endPoint.Address.ToString();
         }
 
-        private void BuildServerVariables(HttpClient client, Dictionary<string, string> headers, string request, string protocol)
+        private void BuildServerVariables(HttpClient client)
         {
             ServerVariables = new NameValueCollection();
 
@@ -225,7 +224,7 @@ namespace NHttp
             var allHttp = new StringBuilder();
             var allRaw = new StringBuilder();
 
-            foreach (var item in headers)
+            foreach (var item in client.Headers)
             {
                 ServerVariables[item.Key] = item.Value;
 
@@ -253,7 +252,7 @@ namespace NHttp
             ServerVariables["LOCAL_ADDR"] = client.Server.EndPoint.Address.ToString();
             ServerVariables["PATH_INFO"] = Path;
 
-            string[] parts = request.Split(new[] { '?' }, 2);
+            string[] parts = client.Request.Split(new[] { '?' }, 2);
 
             ServerVariables["QUERY_STRING"] = parts.Length == 2 ? parts[1] : "";
             ServerVariables["REMOTE_ADDR"] = UserHostAddress;
@@ -263,7 +262,7 @@ namespace NHttp
             ServerVariables["SCRIPT_NAME"] = Path;
             ServerVariables["SERVER_NAME"] = client.Server.ServerUtility.MachineName;
             ServerVariables["SERVER_PORT"] = client.Server.EndPoint.Port.ToString(CultureInfo.InvariantCulture);
-            ServerVariables["SERVER_PROTOCOL"] = protocol;
+            ServerVariables["SERVER_PROTOCOL"] = client.Protocol;
             ServerVariables["URL"] = Path;
         }
 
