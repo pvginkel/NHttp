@@ -152,13 +152,23 @@ namespace NHttp
 
             try
             {
-                var tcpClient = _listener.EndAcceptTcpClient(asyncResult);
+                var listener = _listener; // Prevent race condition.
+
+                if (listener == null)
+                    return;
+
+                var tcpClient = listener.EndAcceptTcpClient(asyncResult);
 
                 var client = new HttpClient(this, tcpClient);
 
                 client.BeginRequest();
 
                 BeginAcceptTcpClient();
+            }
+            catch (ObjectDisposedException)
+            {
+                // EndAcceptTcpClient will throw a ObjectDisposedException
+                // when we're shutting down. This can safely be ignored.
             }
             catch (Exception ex)
             {
