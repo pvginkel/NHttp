@@ -16,11 +16,10 @@ namespace NHttp
         private static readonly Regex PrologRegex = new Regex("^(GET|POST) ([^ ]+) (HTTP/[^ ]+)$");
 
         private bool _disposed;
-        private readonly byte[] _readBuffer;
+        private readonly ReadBuffer _readBuffer;
         private readonly byte[] _writeBuffer;
         private NetworkStream _stream;
         private ClientState _state;
-        private StringBuilder _lineBuffer;
         private MemoryStream _writeStream;
         private RequestParser _parser;
         private HttpContext _context;
@@ -49,7 +48,7 @@ namespace NHttp
             Server = server;
             TcpClient = client;
 
-            _readBuffer = new byte[server.ReadBufferSize];
+            _readBuffer = new ReadBuffer(server.ReadBufferSize);
             _writeBuffer = new byte[server.WriteBufferSize];
 
             _stream = client.GetStream();
@@ -58,7 +57,6 @@ namespace NHttp
         private void Reset()
         {
             _state = ClientState.ReadingProlog;
-            _lineBuffer = null;
             _parser = null;
             _context = null;
 
@@ -67,6 +65,8 @@ namespace NHttp
                 _writeStream.Dispose();
                 _writeStream = null;
             }
+
+            _readBuffer.Reset();
 
             Method = null;
             Protocol = null;
@@ -89,7 +89,7 @@ namespace NHttp
 
             try
             {
-                _stream.BeginRead(_readBuffer, 0, _readBuffer.Length, ReadCallback, null);
+                _stream.BeginRead(_readBuffer.Buffer, 0, _readBuffer.Buffer.Length, ReadCallback, null);
             }
             catch (Exception ex)
             {
@@ -108,22 +108,9 @@ namespace NHttp
             {
                 int read = _stream.EndRead(asyncResult);
 
-                ProcessReadBuffer(read);
+                _readBuffer.SetAvailable(read);
 
-                if (read > 0 && _state != ClientState.Closed)
-                {
-                    // If we have a write stream, we're writing.
-
-                    if (_writeStream == null)
-                        BeginRead();
-                }
-                else
-                {
-                    // A value of 0 returned by EndRead means that the remote
-                    // side has already closed the connection.
-
-                    Dispose();
-                }
+                ProcessReadBuffer();
             }
             catch (Exception ex)
             {
@@ -133,27 +120,42 @@ namespace NHttp
             }
         }
 
-        private void ProcessReadBuffer(int read)
+        private void ProcessReadBuffer()
         {
             switch (_state)
             {
                 case ClientState.ReadingProlog:
-                    ProcessProlog(0, read);
+                    ProcessProlog();
                     break;
 
                 case ClientState.ReadingHeaders:
-                    ProcessHeaders(0, read);
+                    ProcessHeaders();
                     break;
 
                 case ClientState.ReadingContent:
-                    ProcessContent(0, read);
+                    ProcessContent();
                     break;
+            }
+
+            if (_readBuffer.Available > 0 && _state != ClientState.Closed)
+            {
+                // If we have a write stream, we're writing.
+
+                if (_writeStream == null)
+                    BeginRead();
+            }
+            else
+            {
+                // A value of 0 returned by EndRead means that the remote
+                // side has already closed the connection.
+
+                Dispose();
             }
         }
 
-        private void ProcessProlog(int offset, int available)
+        private void ProcessProlog()
         {
-            string line = ReadLine(ref offset, available);
+            string line = _readBuffer.ReadLine();
 
             if (line == null)
                 return;
@@ -178,12 +180,12 @@ namespace NHttp
 
             _state = ClientState.ReadingHeaders;
 
-            ProcessHeaders(offset, available);
+            ProcessHeaders();
         }
 
-        private void ProcessHeaders(int offset, int available)
+        private void ProcessHeaders()
         {
-            string line = ReadLine(ref offset, available);
+            string line = _readBuffer.ReadLine();
 
             if (line == null)
                 return;
@@ -196,7 +198,7 @@ namespace NHttp
 
                 _state = ClientState.ReadingContent;
 
-                ProcessContent(offset, available);
+                ProcessContent();
             }
             else
             {
@@ -212,23 +214,23 @@ namespace NHttp
 
                     // Continue reading the next header.
 
-                    ProcessHeaders(offset, available);
+                    ProcessHeaders();
                 }
             }
         }
 
-        private void ProcessContent(int offset, int available)
+        private void ProcessContent()
         {
             if (_parser != null)
             {
-                _parser.Parse(ref offset, available);
+                _parser.Parse();
                 return;
             }
 
             if (ProcessExpectHeader())
                 return;
 
-            if (ProcessContentLengthHeader(offset, available))
+            if (ProcessContentLengthHeader())
                 return;
 
             // The request has been completely parsed now.
@@ -268,7 +270,7 @@ namespace NHttp
             return false;
         }
 
-        private bool ProcessContentLengthHeader(int offset, int available)
+        private bool ProcessContentLengthHeader()
         {
             // Read the content.
 
@@ -312,7 +314,7 @@ namespace NHttp
                 // We've made a parser available. Recurs back to start processing
                 // with the parser.
 
-                ProcessContent(offset, available);
+                ProcessContent();
                 return true;
             }
 
@@ -391,7 +393,10 @@ namespace NHttp
                             break;
 
                         default:
-                            BeginRead();
+                            if (_readBuffer.DataAvailable)
+                                ProcessReadBuffer();
+                            else
+                                BeginRead();
                             break;
                     }
                 }
@@ -402,32 +407,6 @@ namespace NHttp
 
                 Dispose();
             }
-        }
-
-        private string ReadLine(ref int offset, int available)
-        {
-            if (_lineBuffer == null)
-                _lineBuffer = new StringBuilder();
-
-            while (offset < available)
-            {
-                int c = _readBuffer[offset++];
-
-                if (c == '\n')
-                {
-                    string line = _lineBuffer.ToString();
-
-                    _lineBuffer = new StringBuilder();
-
-                    return line;
-                }
-                else if (c != '\r')
-                {
-                    _lineBuffer.Append((char)c);
-                }
-            }
-
-            return null;
         }
 
         private void ExecuteRequest()

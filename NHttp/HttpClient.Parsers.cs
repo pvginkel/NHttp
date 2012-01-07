@@ -22,12 +22,10 @@ namespace NHttp
                 ContentLength = contentLength;
             }
 
-            public abstract void Parse(ref int offset, int available);
+            public abstract void Parse();
 
-            protected void EndParsing(int offset, int available)
+            protected void EndParsing()
             {
-                Debug.Assert(offset == available);
-
                 // Disconnect the parser.
 
                 Client._parser = null;
@@ -48,26 +46,15 @@ namespace NHttp
                 _stream = new MemoryStream();
             }
 
-            public override void Parse(ref int offset, int available)
+            public override void Parse()
             {
-                int toRead = Math.Min(
-                    available - offset,
-                    ContentLength - (int)_stream.Length
-                );
-
-                _stream.Write(Client._readBuffer, offset, toRead);
-
-                offset += toRead;
+                Client._readBuffer.CopyToStream(_stream, ContentLength);
 
                 if (_stream.Length == ContentLength)
                 {
                     ParseContent();
 
-                    EndParsing(offset, available);
-                }
-                else
-                {
-                    Debug.Assert(offset == available);
+                    EndParsing();
                 }
             }
 
