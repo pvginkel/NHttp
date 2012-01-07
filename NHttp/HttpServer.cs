@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Text;
 using Common.Logging;
 
@@ -88,7 +87,7 @@ namespace NHttp
 
                 _listener = listener;
 
-                ServerUtility = new HttpServerUtility(this);
+                ServerUtility = new HttpServerUtility();
 
                 IsActive = true;
 

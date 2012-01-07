@@ -21,7 +21,7 @@ namespace NHttp.Test.WebRequestFixtures
                 server.RequestReceived += (s, e) =>
                 {
                     Assert.That(e.Request.QueryString.AllKeys, Is.EquivalentTo(new[] { "key" }));
-                    Assert.AreEqual(e.Request.QueryString["key"], "value");
+                    Assert.AreEqual("value", e.Request.QueryString["key"]);
 
                     using (var writer = new StreamWriter(e.Response.OutputStream))
                     {
@@ -39,7 +39,7 @@ namespace NHttp.Test.WebRequestFixtures
                 using (var stream = response.GetResponseStream())
                 using (var reader = new StreamReader(stream))
                 {
-                    Assert.AreEqual(reader.ReadToEnd(), ResponseText);
+                    Assert.AreEqual(ResponseText, reader.ReadToEnd());
                 }
             }
         }

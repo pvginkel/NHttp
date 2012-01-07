@@ -38,6 +38,8 @@ namespace NHttp
 
         public Dictionary<string, string> PostParameters { get; private set; }
 
+        public List<MultiPartItem> MultiPartItems { get; private set; }
+
         public HttpClient(HttpServer server, TcpClient client)
         {
             if (server == null)
@@ -57,8 +59,13 @@ namespace NHttp
         private void Reset()
         {
             _state = ClientState.ReadingProlog;
-            _parser = null;
             _context = null;
+
+            if (_parser != null)
+            {
+                _parser.Dispose();
+                _parser = null;
+            }
 
             if (_writeStream != null)
             {
@@ -73,6 +80,17 @@ namespace NHttp
             Request = null;
             Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             PostParameters = null;
+
+            if (MultiPartItems != null)
+            {
+                foreach (var item in MultiPartItems)
+                {
+                    if (item.Stream != null)
+                        item.Stream.Dispose();
+                }
+
+                MultiPartItems = null;
+            }
         }
 
         public void BeginRequest()
@@ -89,7 +107,7 @@ namespace NHttp
 
             try
             {
-                _stream.BeginRead(_readBuffer.Buffer, 0, _readBuffer.Buffer.Length, ReadCallback, null);
+                _readBuffer.BeginRead(_stream, ReadCallback, null);
             }
             catch (Exception ex)
             {
@@ -106,9 +124,7 @@ namespace NHttp
 
             try
             {
-                int read = _stream.EndRead(asyncResult);
-
-                _readBuffer.SetAvailable(read);
+                _readBuffer.EndRead(_stream, asyncResult);
 
                 ProcessReadBuffer();
             }
@@ -137,7 +153,7 @@ namespace NHttp
                     break;
             }
 
-            if (_readBuffer.Available > 0 && _state != ClientState.Closed)
+            if (_readBuffer.DataAvailable && _state != ClientState.Closed)
             {
                 // If we have a write stream, we're writing.
 
@@ -185,36 +201,39 @@ namespace NHttp
 
         private void ProcessHeaders()
         {
-            string line = _readBuffer.ReadLine();
+            string line;
 
-            if (line == null)
-                return;
-
-            // Have we completed receiving the headers?
-
-            if (line.Length == 0)
+            while ((line = _readBuffer.ReadLine()) != null)
             {
-                // Start processing the body of the request.
+                // Have we completed receiving the headers?
 
-                _state = ClientState.ReadingContent;
+                if (line.Length == 0)
+                {
+                    // Reset the read buffer which resets the bytes read.
 
-                ProcessContent();
-            }
-            else
-            {
+                    _readBuffer.Reset();
+
+                    // Start processing the body of the request.
+
+                    _state = ClientState.ReadingContent;
+
+                    ProcessContent();
+
+                    return;
+                }
+
                 string[] parts = line.Split(new[] { ':' }, 2);
 
                 if (parts.Length != 2)
                 {
+                    Log.Warn("Received header without colon");
+
                     _state = ClientState.Closed;
+                    return;
                 }
                 else
                 {
                     Headers[parts[0].Trim()] = parts[1].Trim();
-
-                    // Continue reading the next header.
-
-                    ProcessHeaders();
                 }
             }
         }
@@ -298,10 +317,37 @@ namespace NHttp
                     return true;
                 }
 
-                switch (contentTypeHeader.ToLowerInvariant())
+                string[] parts = contentTypeHeader.Split(new[] { ';' }, 2);
+
+                HttpUtil.TrimAll(parts);
+
+                if (_parser != null)
+                {
+                    _parser.Dispose();
+                    _parser = null;
+                }
+
+                switch (parts[0].ToLowerInvariant())
                 {
                     case "application/x-www-form-urlencoded":
                         _parser = new UrlEncodedParser(this, contentLength);
+                        break;
+
+                    case "multipart/form-data":
+                        if (parts.Length == 2)
+                        {
+                            parts = parts[1].Split(new[] { '=' }, 2);
+
+                            if (
+                                parts.Length == 2 &&
+                                String.Equals(parts[0], "boundary", StringComparison.OrdinalIgnoreCase)
+                            )
+                                _parser = new MultiPartParser(this, contentLength, parts[1]);
+                        }
+
+                        if (_parser == null)
+                            _state = ClientState.Closed;
+
                         break;
 
                     default:
@@ -541,11 +587,7 @@ namespace NHttp
                     TcpClient = null;
                 }
 
-                if (_writeStream != null)
-                {
-                    _writeStream.Dispose();
-                    _writeStream = null;
-                }
+                Reset();
 
                 _disposed = true;
             }

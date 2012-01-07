@@ -6,12 +6,9 @@ namespace NHttp
 {
     public class HttpServerUtility
     {
-        internal HttpServerUtility(HttpServer server)
+        internal HttpServerUtility()
         {
-            Server = server;
         }
-
-        internal HttpServer Server { get; private set; }
 
         public string MachineName
         {

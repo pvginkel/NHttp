@@ -18,7 +18,7 @@ namespace NHttp.Test.WebBrowserFixtures
             RegisterHandler("/submit", p =>
             {
                 Assert.That(p.Request.Form.AllKeys, Is.EquivalentTo(new[] { "key" }));
-                Assert.AreEqual(p.Request.Form["key"], "value");
+                Assert.AreEqual("value", p.Request.Form["key"]);
             });
 
             DocumentCompleted += (s, e) =>

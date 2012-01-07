@@ -39,7 +39,7 @@
   <ItemGroup>
     <Compile Include="HttpClient.cs" />
     <Compile Include="HttpContext.cs" />
-    <Compile Include="HttpFile.cs" />
+    <Compile Include="HttpPostedFile.cs" />
     <Compile Include="HttpFileCollection.cs" />
     <Compile Include="HttpOutputStream.cs" />
     <Compile Include="HttpRequest.cs" />

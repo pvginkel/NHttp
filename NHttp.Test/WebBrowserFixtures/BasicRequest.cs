@@ -26,7 +26,7 @@ namespace NHttp.Test.WebBrowserFixtures
 
             DocumentCompleted += (s, e) =>
             {
-                Assert.AreEqual(e.WebBrowser.DocumentText, ResponseText);
+                Assert.AreEqual(ResponseText, e.WebBrowser.DocumentText);
 
                 navigated = true;
             };

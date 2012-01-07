@@ -4,11 +4,14 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using Common.Logging;
 
 namespace NHttp
 {
     public class HttpRequest
     {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(HttpRequest));
+
         private static readonly string[] EmptyStringArray = new string[0];
 
         public string[] AcceptTypes { get; private set; }
@@ -55,9 +58,9 @@ namespace NHttp
         {
             ParseHeaders(client);
 
-            Files = new HttpFileCollection();
-
             Form = CreateCollection(client.PostParameters);
+
+            ParseMultiPartItems(client);
 
             HttpMethod = RequestType = client.Method;
 
@@ -82,10 +85,7 @@ namespace NHttp
             {
                 string[] parts = header.Split(',');
 
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    parts[i] = parts[i].Trim();
-                }
+                HttpUtil.TrimAll(parts);
 
                 AcceptTypes = parts;
             }
@@ -139,10 +139,7 @@ namespace NHttp
             {
                 string[] parts = header.Split(',');
 
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    parts[i] = parts[i].Trim();
-                }
+                HttpUtil.TrimAll(parts);
 
                 UserLanguages = parts;
             }
@@ -150,6 +147,67 @@ namespace NHttp
             {
                 UserLanguages = EmptyStringArray;
             }
+        }
+
+        private void ParseMultiPartItems(HttpClient client)
+        {
+            Files = new HttpFileCollection();
+
+            if (client.MultiPartItems == null)
+                return;
+
+            foreach (var item in client.MultiPartItems)
+            {
+                string contentType = null;
+                string name = null;
+                string fileName = null;
+
+                string header;
+
+                if (item.Headers.TryGetValue("Content-Disposition", out header))
+                {
+                    string[] parts = header.Split(';');
+
+                    for (int i = 0; i < parts.Length; i++)
+                    {
+                        string part = parts[i].Trim();
+
+                        if (part.StartsWith("name="))
+                            name = ParseContentDispositionItem(part.Substring(5));
+                        else if (part.StartsWith("filename="))
+                            fileName = ParseContentDispositionItem(part.Substring(9));
+                    }
+                }
+
+                if (item.Headers.TryGetValue("Content-Type", out header))
+                    contentType = header;
+
+                if (name == null)
+                {
+                    Log.Warn("Received multipart item without name");
+                    continue;
+                }
+
+                if (item.Value != null)
+                {
+                    Form[name] = item.Value;
+                }
+                else
+                {
+                    Files.AddFile(name, new HttpPostedFile((int)item.Stream.Length, contentType, fileName, item.Stream));
+                }
+            }
+        }
+
+        private string ParseContentDispositionItem(string value)
+        {
+            if (value.Length == 0)
+                return value;
+
+            if (value.Length >= 2 && value[0] == '"' && value[value.Length - 1] == '"')
+                value = value.Substring(1, value.Length - 2);
+
+            return HttpUtil.UriDecode(value);
         }
 
         private void ParsePath(HttpClient client)

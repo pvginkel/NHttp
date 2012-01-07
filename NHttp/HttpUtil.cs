@@ -129,5 +129,13 @@ namespace NHttp
                     throw new ArgumentOutOfRangeException("value");
             }
         }
+
+        public static void TrimAll(string[] parts)
+        {
+            for (int i = 0; i < parts.Length; i++)
+            {
+                parts[i] = parts[i].Trim();
+            }
+        }
     }
 }
