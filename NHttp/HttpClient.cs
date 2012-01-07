@@ -59,9 +59,14 @@ namespace NHttp
             _request = null;
             _headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             _postParameters = null;
-            _writeStream = null;
             _parser = null;
             _context = null;
+
+            if (_writeStream != null)
+            {
+                _writeStream.Dispose();
+                _writeStream = null;
+            }
         }
 
         public void BeginRequest()
@@ -321,6 +326,9 @@ namespace NHttp
 
             var bytes = Encoding.ASCII.GetBytes(sb.ToString());
 
+            if (_writeStream != null)
+                _writeStream.Dispose();
+
             _writeStream = new MemoryStream();
             _writeStream.Write(bytes, 0, bytes.Length);
             _writeStream.Position = 0;
@@ -361,6 +369,9 @@ namespace NHttp
                 }
                 else
                 {
+                    if (_writeStream != null)
+                        _writeStream.Dispose();
+
                     _writeStream = null;
 
                     switch (_state)
@@ -427,6 +438,9 @@ namespace NHttp
         private void WriteResponseHeaders()
         {
             var headers = BuildResponseHeaders();
+
+            if (_writeStream != null)
+                _writeStream.Dispose();
 
             _writeStream = new MemoryStream(headers);
 
@@ -500,6 +514,9 @@ namespace NHttp
 
         private void WriteResponseContent()
         {
+            if (_writeStream != null)
+                _writeStream.Dispose();
+
             _writeStream = _context.Response.OutputStream.BaseStream;
             _writeStream.Position = 0;
 
@@ -537,6 +554,12 @@ namespace NHttp
                 {
                     TcpClient.Close();
                     TcpClient = null;
+                }
+
+                if (_writeStream != null)
+                {
+                    _writeStream.Dispose();
+                    _writeStream = null;
                 }
 
                 _disposed = true;
