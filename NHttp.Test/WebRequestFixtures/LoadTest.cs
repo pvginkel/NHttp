@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace NHttp.Test.WebRequestFixtures
 {
     [TestFixture]
-    public class LoadTestFixture : FixtureBase
+    public class LoadTest : FixtureBase
     {
         private const string Payload = "Request payload";
         private const int LargeResponseSize = 1 * 1024 * 1024;
