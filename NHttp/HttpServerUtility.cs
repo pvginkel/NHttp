@@ -14,5 +14,25 @@ namespace NHttp
         {
             get { return Environment.MachineName; }
         }
+
+        public string HtmlEncode(string value)
+        {
+            return HttpUtil.HtmlEncode(value);
+        }
+
+        public string HtmlDecode(string value)
+        {
+            return HttpUtil.HtmlDecode(value);
+        }
+
+        public string UrlEncode(string text)
+        {
+            return Uri.EscapeDataString(text);
+        }
+
+        public string UrlDecode(string text)
+        {
+            return HttpUtil.UriDecode(text);
+        }
     }
 }
