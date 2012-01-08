@@ -69,7 +69,6 @@
     <Compile Include="Support\WebBrowserForm.Designer.cs">
       <DependentUpon>WebBrowserForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="WebRequestFixtures\Upload.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NHttp\NHttp.csproj">

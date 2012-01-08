@@ -12,6 +12,7 @@ namespace NHttp.Test.WebRequestFixtures
     public class PostRequest : FixtureBase
     {
         private const string ResponseText = "Response text";
+        private const int UploadSize = 1 * 1024 * 1024;
 
         [Test]
         public void SimplePost()
@@ -22,6 +23,9 @@ namespace NHttp.Test.WebRequestFixtures
                 {
                     Assert.That(e.Request.Form.AllKeys, Is.EquivalentTo(new[] { "key" }));
                     Assert.AreEqual("value", e.Request.Form["key"]);
+                    Assert.AreEqual("application/x-www-form-urlencoded", e.Request.ContentType);
+                    Assert.AreEqual("POST", e.Request.HttpMethod);
+                    Assert.IsNull(e.Request.InputStream);
 
                     using (var writer = new StreamWriter(e.Response.OutputStream))
                     {
@@ -51,6 +55,50 @@ namespace NHttp.Test.WebRequestFixtures
                 using (var reader = new StreamReader(stream))
                 {
                     Assert.AreEqual(ResponseText, reader.ReadToEnd());
+                }
+            }
+        }
+
+        [Test]
+        public void UploadBinaryData()
+        {
+            using (var server = new HttpServer())
+            using (var uploadStream = new MemoryStream())
+            {
+                WriteRandomData(uploadStream, UploadSize);
+
+                server.RequestReceived += (s, e) =>
+                {
+                    uploadStream.Position = 0;
+
+                    Assert.AreEqual(uploadStream, e.Request.InputStream);
+                    Assert.AreEqual(UploadSize, e.Request.ContentLength);
+                    Assert.AreEqual("application/octet-stream", e.Request.ContentType);
+                    Assert.AreEqual("POST", e.Request.HttpMethod);
+                };
+
+                server.Start();
+
+                var request = (HttpWebRequest)WebRequest.Create(
+                    String.Format("http://{0}/", server.EndPoint)
+                );
+
+                request.Method = "POST";
+                request.ContentType = "application/octet-stream";
+                request.ContentLength = UploadSize;
+
+                using (var stream = request.GetRequestStream())
+                {
+                    uploadStream.Position = 0;
+
+                    uploadStream.CopyTo(stream);
+                }
+
+                using (var response = request.GetResponse())
+                using (var stream = response.GetResponseStream())
+                using (var reader = new StreamReader(stream))
+                {
+                    reader.ReadToEnd();
                 }
             }
         }
