@@ -51,6 +51,7 @@
     <Compile Include="HttpServer.cs" />
     <Compile Include="HttpServerState.cs" />
     <Compile Include="HttpServerUtility.cs" />
+    <Compile Include="HttpUnknownRequestParser.cs" />
     <Compile Include="HttpUrlEncodedRequestParser.cs" />
     <Compile Include="HttpUtil.cs" />
     <Compile Include="NHttpException.cs" />

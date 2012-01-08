@@ -42,6 +42,8 @@ namespace NHttp
 
         public HttpReadBuffer ReadBuffer { get; private set; }
 
+        public Stream InputStream { get; set; }
+
         public HttpClient(HttpServer server, TcpClient client)
         {
             if (server == null)
@@ -73,6 +75,12 @@ namespace NHttp
             {
                 _writeStream.Dispose();
                 _writeStream = null;
+            }
+
+            if (InputStream != null)
+            {
+                InputStream.Dispose();
+                InputStream = null;
             }
 
             ReadBuffer.Reset();
@@ -331,7 +339,8 @@ namespace NHttp
                         break;
 
                     default:
-                        throw new ProtocolException(String.Format("Could not process Content-Type header '{0}'", contentTypeHeader));
+                        _parser = new HttpUnknownRequestParser(this, contentLength);
+                        break;
                 }
 
                 // We've made a parser available. Recurs back to start processing

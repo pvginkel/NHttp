@@ -57,7 +57,7 @@
     <Compile Include="Support\FixtureBase.cs" />
     <Compile Include="WebRequestFixtures\ExceptionInHandler.cs" />
     <Compile Include="WebRequestFixtures\GracefullShutdown.cs" />
-    <Compile Include="WebRequestFixtures\LoadTestFixture.cs" />
+    <Compile Include="WebRequestFixtures\LoadTest.cs" />
     <Compile Include="WebRequestFixtures\PostRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Support\RequestHandler.cs" />
@@ -69,6 +69,7 @@
     <Compile Include="Support\WebBrowserForm.Designer.cs">
       <DependentUpon>WebBrowserForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="WebRequestFixtures\Upload.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NHttp\NHttp.csproj">

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Text;
 using Common.Logging;
@@ -29,6 +30,8 @@ namespace NHttp
         public NameValueCollection Headers { get; private set; }
 
         public string HttpMethod { get; private set; }
+
+        public Stream InputStream { get; private set; }
 
         public NameValueCollection Params { get; private set; }
 
@@ -71,6 +74,8 @@ namespace NHttp
             BuildServerVariables(client);
 
             BuildParams();
+
+            InputStream = client.InputStream;
         }
 
         private void ParseHeaders(HttpClient client)
