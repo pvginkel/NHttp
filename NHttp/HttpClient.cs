@@ -123,6 +123,17 @@ namespace NHttp
             if (_disposed)
                 return;
 
+            // The below state matches the RequestClose state. Dispose immediately
+            // when this occurs.
+
+            if (
+                _state == ClientState.ReadingProlog &&
+                Server.State != HttpServerState.Started
+            ) {
+                Dispose();
+                return;
+            }
+
             try
             {
                 _readBuffer.EndRead(_stream, asyncResult);
@@ -530,7 +541,10 @@ namespace NHttp
         {
             string connectionHeader;
 
+            // Do not accept new requests when the server is stopping.
+
             if (
+                Server.State == HttpServerState.Started &&
                 Headers.TryGetValue("Connection", out connectionHeader) &&
                 String.Equals(connectionHeader, "keep-alive", StringComparison.OrdinalIgnoreCase)
             )
@@ -539,10 +553,31 @@ namespace NHttp
                 Dispose();
         }
 
+        public void RequestClose()
+        {
+            if (_state == ClientState.ReadingProlog)
+            {
+                var stream = _stream;
+
+                if (stream != null)
+                    stream.Dispose();
+            }
+        }
+
+        public void ForceClose()
+        {
+            var stream = _stream;
+
+            if (stream != null)
+                stream.Dispose();
+        }
+
         public void Dispose()
         {
             if (!_disposed)
             {
+                Server.UnregisterClient(this);
+
                 _state = ClientState.Closed;
 
                 if (_stream != null)

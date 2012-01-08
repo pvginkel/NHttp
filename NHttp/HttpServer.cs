@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using Common.Logging;
 
 namespace NHttp
@@ -13,6 +15,24 @@ namespace NHttp
 
         private bool _disposed;
         private TcpListener _listener;
+        private readonly object _syncLock = new object();
+        private readonly Dictionary<HttpClient, bool> _clients = new Dictionary<HttpClient, bool>();
+        private HttpServerState _state = HttpServerState.Stopped;
+        private AutoResetEvent _clientsChangedEvent = new AutoResetEvent(false);
+
+        public HttpServerState State
+        {
+            get { return _state; }
+            private set
+            {
+                if (_state != value)
+                {
+                    _state = value;
+
+                    OnStateChanged(EventArgs.Empty);
+                }
+            }
+        }
 
         public event HttpRequestEventHandler RequestReceived;
 
@@ -24,21 +44,11 @@ namespace NHttp
                 ev(this, e);
         }
 
-        public event EventHandler Started;
+        public event EventHandler StateChanged;
 
-        protected virtual void OnStarted(EventArgs e)
+        protected virtual void OnStateChanged(EventArgs e)
         {
-            var ev = Started;
-
-            if (ev != null)
-                ev(this, e);
-        }
-
-        protected event EventHandler Stopping;
-
-        protected virtual void OnStopping(EventArgs e)
-        {
-            var ev = Stopping;
+            var ev = StateChanged;
 
             if (ev != null)
                 ev(this, e);
@@ -46,13 +56,13 @@ namespace NHttp
 
         public IPEndPoint EndPoint { get; set; }
 
-        public bool IsActive { get; private set; }
-
         public int ReadBufferSize { get; set; }
 
         public int WriteBufferSize { get; set; }
 
         public string ServerBanner { get; set; }
+
+        public TimeSpan ShutdownTimeout { get; set; }
 
         internal HttpServerUtility ServerUtility { get; private set; }
 
@@ -62,16 +72,16 @@ namespace NHttp
 
             ReadBufferSize = 4096;
             WriteBufferSize = 4096;
+            ShutdownTimeout = TimeSpan.FromSeconds(30);
 
             ServerBanner = String.Format("NHttp/{0}", GetType().Assembly.GetName().Version);
         }
 
         public void Start()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().Name);
-            if (IsActive)
-                throw new InvalidOperationException("Server is already active");
+            VerifyState(HttpServerState.Stopped);
+
+            State = HttpServerState.Starting;
 
             Log.Debug(String.Format("Starting HTTP server at {0}", EndPoint));
 
@@ -89,40 +99,43 @@ namespace NHttp
 
                 ServerUtility = new HttpServerUtility();
 
-                IsActive = true;
-
                 Log.Info(String.Format("HTTP server running at {0}", EndPoint));
             }
             catch (Exception ex)
             {
-                Log.Warn("Failed to start HTTP server", ex);
+                State = HttpServerState.Stopped;
+
+                Log.Error("Failed to start HTTP server", ex);
 
                 throw new NHttpException("Failed to start HTTP server", ex);
             }
 
-            BeginAcceptTcpClient();
+            State = HttpServerState.Started;
 
-            OnStarted(EventArgs.Empty);
+            BeginAcceptTcpClient();
         }
 
         public void Stop()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().Name);
-            if (!IsActive)
-                throw new InvalidOperationException("Server is not active");
+            VerifyState(HttpServerState.Started);
 
             Log.Debug("Stopping HTTP server");
 
-            OnStopping(EventArgs.Empty);
+            State = HttpServerState.Stopping;
 
             try
             {
+                // Prevent any new connections.
+
                 _listener.Stop();
+
+                // Wait for all clients to complete.
+
+                StopClients();
             }
             catch (Exception ex)
             {
-                Log.Warn("Failed to stop HTTP server", ex);
+                Log.Error("Failed to stop HTTP server", ex);
 
                 throw new NHttpException("Failed to stop HTTP server", ex);
             }
@@ -130,15 +143,85 @@ namespace NHttp
             {
                 _listener = null;
 
-                IsActive = false;
+                State = HttpServerState.Stopped;
 
                 Log.Info("Stopped HTTP server");
             }
         }
 
+        private void StopClients()
+        {
+            var shutdownStarted = DateTime.Now;
+            bool forceShutdown = false;
+
+            // Clients that are waiting for new requests are closed.
+
+            List<HttpClient> clients;
+
+            lock (_syncLock)
+            {
+                clients = new List<HttpClient>(_clients.Keys);
+            }
+
+            foreach (var client in clients)
+            {
+                client.RequestClose();
+            }
+
+            // First give all clients a chance to complete their running requests.
+
+            while (true)
+            {
+                lock (_syncLock)
+                {
+                    if (_clients.Count == 0)
+                        break;
+                }
+
+                var shutdownRunning = DateTime.Now - shutdownStarted;
+
+                if (shutdownRunning >= ShutdownTimeout)
+                {
+                    forceShutdown = true;
+                    break;
+                }
+
+                _clientsChangedEvent.WaitOne(ShutdownTimeout - shutdownRunning);
+            }
+
+            if (!forceShutdown)
+                return;
+
+            // If there are still clients running after the timeout, their
+            // connections will be forcibly closed.
+
+            lock (_syncLock)
+            {
+                clients = new List<HttpClient>(_clients.Keys);
+            }
+
+            foreach (var client in clients)
+            {
+                client.ForceClose();
+            }
+
+            // Wait for the registered clients to be cleared.
+
+            while (true)
+            {
+                lock (_syncLock)
+                {
+                    if (_clients.Count == 0)
+                        break;
+                }
+
+                _clientsChangedEvent.WaitOne();
+            }
+        }
+
         private void BeginAcceptTcpClient()
         {
-            if (!IsActive)
+            if (_state != HttpServerState.Started)
                 return;
 
             _listener.BeginAcceptTcpClient(AcceptTcpClientCallback, null);
@@ -146,7 +229,7 @@ namespace NHttp
 
         private void AcceptTcpClientCallback(IAsyncResult asyncResult)
         {
-            if (!IsActive)
+            if (_state != HttpServerState.Started)
                 return;
 
             try
@@ -159,6 +242,8 @@ namespace NHttp
                 var tcpClient = listener.EndAcceptTcpClient(asyncResult);
 
                 var client = new HttpClient(this, tcpClient);
+
+                RegisterClient(client);
 
                 client.BeginRequest();
 
@@ -175,12 +260,54 @@ namespace NHttp
             }
         }
 
+        private void RegisterClient(HttpClient client)
+        {
+            if (client == null)
+                throw new ArgumentNullException("client");
+
+            lock (_syncLock)
+            {
+                _clients.Add(client, true);
+
+                _clientsChangedEvent.Set();
+            }
+        }
+
+        internal void UnregisterClient(HttpClient client)
+        {
+            if (client == null)
+                throw new ArgumentNullException("client");
+
+            lock (_syncLock)
+            {
+                Debug.Assert(_clients.ContainsKey(client));
+
+                _clients.Remove(client);
+
+                _clientsChangedEvent.Set();
+            }
+        }
+
+        private void VerifyState(HttpServerState state)
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().Name);
+            if (_state != state)
+                throw new InvalidOperationException(String.Format("Expected server to be in the '{0}' state", state));
+        }
+
         public void Dispose()
         {
             if (!_disposed)
             {
-                if (IsActive)
+                if (_state == HttpServerState.Started)
                     Stop();
+
+                if (_clientsChangedEvent != null)
+                {
+                    ((IDisposable)_clientsChangedEvent).Dispose();
+                    _clientsChangedEvent = null;
+                }
 
                 _disposed = true;
             }

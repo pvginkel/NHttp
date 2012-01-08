@@ -45,6 +45,7 @@
     <Compile Include="HttpRequest.cs" />
     <Compile Include="HttpResponse.cs" />
     <Compile Include="HttpServer.cs" />
+    <Compile Include="HttpServerState.cs" />
     <Compile Include="HttpServerUtility.cs" />
     <Compile Include="HttpUtil.cs" />
     <Compile Include="NHttpException.cs" />

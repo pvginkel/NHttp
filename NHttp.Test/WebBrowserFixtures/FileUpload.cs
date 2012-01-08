@@ -45,15 +45,7 @@ namespace NHttp.Test.WebBrowserFixtures
             {
                 using (var tempFile = File.Create(tempFileName))
                 {
-                    var randomBytes = new byte[128];
-                    new Random().NextBytes(randomBytes);
-
-                    // Write 10 MB of random data.
-
-                    for (int i = 0; i < 81920; i++)
-                    {
-                        tempFile.Write(randomBytes, 0, randomBytes.Length);
-                    }
+                    WriteRandomData(tempFile, 10 * 1024 * 1024);
                 }
 
                 PerformFileUpload(tempFileName, "application/octet-stream");
@@ -102,7 +94,7 @@ namespace NHttp.Test.WebBrowserFixtures
 
             Navigate("/form");
 
-            submittedEvent.WaitOne();
+            Assert.That(submittedEvent.WaitOne(TimeSpan.FromSeconds(5)), "No /submit request received");
         }
     }
 }
