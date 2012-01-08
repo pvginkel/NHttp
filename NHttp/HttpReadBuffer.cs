@@ -74,22 +74,28 @@ namespace NHttp
             );
 
             bool atBoundary = false;
+            bool partialBoundaryMatch = false;
 
             if (boundary != null)
             {
                 int boundaryOffset = -1;
 
-                for (int i = 0; i <= toRead - boundary.Length; i++)
+                for (int i = 0; i < toRead; i++)
                 {
                     bool boundaryMatched = true;
 
                     for (int j = 0; j < boundary.Length; j++)
                     {
+                        if (i + j >= toRead)
+                        {
+                            partialBoundaryMatch = true;
+                            break;
+                        }
+
                         if (_buffer[i + _offset + j] != boundary[j])
                         {
                             boundaryMatched = false;
                             break;
-
                         }
                     }
 
@@ -116,7 +122,12 @@ namespace NHttp
                     // If we have a boundary, we can read up until the boundary offset.
 
                     toRead = boundaryOffset;
-                    atBoundary = true;
+                    atBoundary = !partialBoundaryMatch;
+
+                    // When we have a partial boundary match, we need more data.
+
+                    if (partialBoundaryMatch)
+                        _forceNewRead = true;
                 }
             }
 

@@ -48,6 +48,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Support\MultiPartWriter.cs" />
     <Compile Include="Support\StreamExtensions.cs" />
     <Compile Include="WebBrowserFixtures\FileUpload.cs" />
     <Compile Include="WebBrowserFixtures\PostRequest.cs" />
@@ -58,6 +59,7 @@
     <Compile Include="WebRequestFixtures\ExceptionInHandler.cs" />
     <Compile Include="WebRequestFixtures\GracefullShutdown.cs" />
     <Compile Include="WebRequestFixtures\LoadTest.cs" />
+    <Compile Include="WebRequestFixtures\MultiPartUpload.cs" />
     <Compile Include="WebRequestFixtures\PostRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Support\RequestHandler.cs" />
