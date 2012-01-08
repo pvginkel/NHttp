@@ -539,6 +539,11 @@ namespace NHttp
 
             WriteHeader(sb, "Content-Length", response.OutputStream.BaseStream.Length.ToString(CultureInfo.InvariantCulture));
 
+            for (int i = 0; i < response.Cookies.Count; i++)
+            {
+                WriteHeader(sb, "Set-Cookie", response.Cookies[i].GetHeaderValue());
+            }
+
             sb.Append("\r\n");
 
             return response.HeadersEncoding.GetBytes(sb.ToString());

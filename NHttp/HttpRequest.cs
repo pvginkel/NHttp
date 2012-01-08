@@ -23,7 +23,9 @@ namespace NHttp
 
         public string ContentType { get; private set; }
 
-        public HttpFileCollection Files { get; private set; } // Not yet populated
+        public HttpCookieCollection Cookies { get; private set; }
+
+        public HttpFileCollection Files { get; private set; }
 
         public NameValueCollection Form { get; private set; }
 
@@ -43,7 +45,7 @@ namespace NHttp
 
         public string RequestType { get; private set; }
 
-        public NameValueCollection ServerVariables { get; private set; } // Must still be populated.
+        public NameValueCollection ServerVariables { get; private set; }
 
         public Uri Url { get; private set; }
 
@@ -151,6 +153,25 @@ namespace NHttp
             else
             {
                 UserLanguages = EmptyStringArray;
+            }
+
+            // Parse Cookie.
+
+            Cookies = new HttpCookieCollection();
+
+            if (client.Headers.TryGetValue("Cookie", out header))
+            {
+                string[] parts = header.Split(';');
+
+                foreach (string part in parts)
+                {
+                    string[] partParts = part.Split(new[] { '=' }, 2);
+
+                    string name = partParts[0].Trim();
+                    string value = partParts.Length == 1 ? null : partParts[1];
+
+                    Cookies.AddCookie(new HttpCookie(name, value), true);
+                }
             }
         }
 

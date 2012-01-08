@@ -45,6 +45,8 @@
   <ItemGroup>
     <Compile Include="HttpClient.cs" />
     <Compile Include="HttpContext.cs" />
+    <Compile Include="HttpCookie.cs" />
+    <Compile Include="HttpCookieCollection.cs" />
     <Compile Include="HttpExceptionEventHandler.cs" />
     <Compile Include="HttpMultiPartItem.cs" />
     <Compile Include="HttpMultiPartRequestParser.cs" />

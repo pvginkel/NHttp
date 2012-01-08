@@ -56,6 +56,7 @@
     <Compile Include="WebBrowserFixtures\BasicRequest.cs" />
     <Compile Include="Support\DocumentCompletedEventHandler.cs" />
     <Compile Include="Support\FixtureBase.cs" />
+    <Compile Include="WebRequestFixtures\Cookies.cs" />
     <Compile Include="WebRequestFixtures\ExceptionInHandler.cs" />
     <Compile Include="WebRequestFixtures\GracefullShutdown.cs" />
     <Compile Include="WebRequestFixtures\LoadTest.cs" />

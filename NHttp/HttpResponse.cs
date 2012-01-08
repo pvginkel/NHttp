@@ -16,6 +16,8 @@ namespace NHttp
 
         public string ContentType { get; set; }
 
+        public HttpCookieCollection Cookies { get; private set; }
+
         public DateTime ExpiresAbsolute { get; set; }
 
         public Encoding HeadersEncoding { get; set; }
@@ -85,6 +87,7 @@ namespace NHttp
             OutputStream = new HttpOutputStream(new MemoryStream());
             StatusCode = 200;
             StatusDescription = "OK";
+            Cookies = new HttpCookieCollection();
         }
 
         public void Redirect(string location)
