@@ -153,19 +153,22 @@ namespace NHttp
                     break;
             }
 
-            if (_readBuffer.DataAvailable && _state != ClientState.Closed)
+            if (_state == ClientState.Closed)
+            {
+                Dispose();
+            }
+            else if (_writeStream != null)
             {
                 // If we have a write stream, we're writing.
-
-                if (_writeStream == null)
-                    BeginRead();
+                return;
+            }
+            else if (_readBuffer.DataAvailable)
+            {
+                ProcessReadBuffer();
             }
             else
             {
-                // A value of 0 returned by EndRead means that the remote
-                // side has already closed the connection.
-
-                Dispose();
+                BeginRead();
             }
         }
 
@@ -437,6 +440,9 @@ namespace NHttp
                         case ClientState.WritingContent:
                             ProcessRequestCompleted();
                             break;
+
+                        case ClientState.Closed:
+                            return;
 
                         default:
                             if (_readBuffer.DataAvailable)

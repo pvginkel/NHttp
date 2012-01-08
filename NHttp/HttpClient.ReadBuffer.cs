@@ -15,10 +15,11 @@ namespace NHttp
             private int _offset;
             private byte[] _buffer;
             private int _available;
+            private bool _forceNewRead;
 
             public bool DataAvailable
             {
-                get { return _offset < _available; }
+                get { return !_forceNewRead && _offset < _available; }
             }
 
             public ReadBuffer(int size)
@@ -107,6 +108,10 @@ namespace NHttp
                         // we cannot test what comes after that.
 
                         toRead -= boundary.Length;
+
+                        // We need to force a new read to get more data.
+
+                        _forceNewRead = true;
                     }
                     else
                     {
@@ -155,6 +160,10 @@ namespace NHttp
 
             public void BeginRead(Stream stream, AsyncCallback callback, object state)
             {
+                // A new read was requested. Reset the flag.
+
+                _forceNewRead = false;
+
                 if (_offset == _available)
                 {
                     // If the offset is at the end, we can just reset the
@@ -168,7 +177,7 @@ namespace NHttp
                     // If there is less than the initial buffer size room left,
                     // we need to move some data.
 
-                    if (_available - _offset < _bufferSize)
+                    if (_buffer.Length - (_available - _offset) < _bufferSize)
                     {
                         // If the available size is less than the initial buffer size,
                         // enlarge the buffer.
@@ -195,7 +204,13 @@ namespace NHttp
                     _offset = 0;
                 }
 
-                stream.BeginRead(_buffer, _available, _buffer.Length - _available, callback, state);
+                // We don't use the whole buffer, only what we were assigned in
+                // the beginning. This is to prevent the read buffer from
+                // resizing too much.
+
+                int bufferAvailable = Math.Min(_buffer.Length - _available, _bufferSize);
+
+                stream.BeginRead(_buffer, _available, bufferAvailable, callback, state);
             }
 
             public void EndRead(Stream stream, IAsyncResult asyncResult)
