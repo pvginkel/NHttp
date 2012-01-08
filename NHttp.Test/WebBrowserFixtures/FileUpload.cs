@@ -28,55 +28,81 @@ namespace NHttp.Test.WebBrowserFixtures
                     tempFile.Flush();
                 }
 
-                RegisterHandler(new ResourceHandler("/form", GetType().Namespace + ".Resources.FileUploadForm.html"));
-
-                var submittedEvent = new ManualResetEvent(false);
-
-                RegisterHandler("/submit", p =>
-                {
-                    Assert.That(p.Request.Form.AllKeys, Is.EquivalentTo(new[] { "key" }));
-                    Assert.AreEqual("value", p.Request.Form["key"]);
-                    Assert.That(p.Request.Files.AllKeys, Is.EquivalentTo(new[] { "file" }));
-
-                    using (var reader = new StreamReader(p.Request.Files["file"].InputStream))
-                    {
-                        Assert.AreEqual(UploadFileContent, reader.ReadToEnd());
-                    }
-
-                    Assert.AreEqual(Path.GetFileName(tempFileName), p.Request.Files["file"].FileName);
-                    Assert.AreEqual(UploadFileContent.Length, p.Request.Files["file"].ContentLength);
-                    Assert.AreEqual("text/plain", p.Request.Files["file"].ContentType);
-
-                    submittedEvent.Set();
-                });
-
-                DocumentCompleted += (s, e) =>
-                {
-                    if (e.Document.Url.AbsolutePath == "/form")
-                    {
-                        var fileElement = (HTMLInputElement)e.Document.GetElementById("file").DomElement;
-                        var formElement = (IHTMLFormElement)e.Document.GetElementById("form").DomElement;
-
-                        fileElement.focus();
-
-                        // The first space is to open the file open dialog. The
-                        // remainder of the spaces is to have some messages for
-                        // until the open dialog actually opens.
-
-                        SendKeys.SendWait("                    " + tempFileName + "{ENTER}");
-
-                        formElement.submit();
-                    }
-                };
-
-                Navigate("/form");
-
-                submittedEvent.WaitOne();
+                PerformFileUpload(tempFileName, "text/plain");
             }
             finally
             {
                 File.Delete(tempFileName);
             }
+        }
+
+        [Test]
+        public void LargeFileUpload()
+        {
+            string tempFileName = Path.GetTempFileName();
+
+            try
+            {
+                using (var tempFile = File.Create(tempFileName))
+                {
+                    var randomBytes = new byte[128];
+                    new Random().NextBytes(randomBytes);
+
+                    // Write 10 MB of random data.
+
+                    for (int i = 0; i < 81920; i++)
+                    {
+                        tempFile.Write(randomBytes, 0, randomBytes.Length);
+                    }
+                }
+
+                PerformFileUpload(tempFileName, "application/octet-stream");
+            }
+            finally
+            {
+                File.Delete(tempFileName);
+            }
+        }
+
+        private void PerformFileUpload(string tempFileName, string contentType)
+        {
+            RegisterHandler(new ResourceHandler("/form", GetType().Namespace + ".Resources.FileUploadForm.html"));
+
+            var submittedEvent = new ManualResetEvent(false);
+
+            RegisterHandler("/submit", p =>
+            {
+                Assert.That(p.Request.Form.AllKeys, Is.EquivalentTo(new[] { "key" }));
+                Assert.AreEqual("value", p.Request.Form["key"]);
+                Assert.That(p.Request.Files.AllKeys, Is.EquivalentTo(new[] { "file" }));
+
+                using (var tempFile = File.OpenRead(tempFileName))
+                {
+                    Assert.AreEqual(tempFile, p.Request.Files["file"].InputStream);
+                    Assert.AreEqual(tempFile.Length, p.Request.Files["file"].ContentLength);
+                }
+
+                Assert.AreEqual(Path.GetFileName(tempFileName), p.Request.Files["file"].FileName);
+                Assert.AreEqual(contentType, p.Request.Files["file"].ContentType);
+
+                submittedEvent.Set();
+            });
+
+            DocumentCompleted += (s, e) =>
+            {
+                if (e.Document.Url.AbsolutePath == "/form")
+                {
+                    SetFileUpload(e.Document, "file", tempFileName);
+
+                    var formElement = (IHTMLFormElement)e.Document.GetElementById("form").DomElement;
+
+                    formElement.submit();
+                }
+            };
+
+            Navigate("/form");
+
+            submittedEvent.WaitOne();
         }
     }
 }
