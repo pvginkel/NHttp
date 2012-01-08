@@ -39,25 +39,24 @@
   <ItemGroup>
     <Compile Include="HttpClient.cs" />
     <Compile Include="HttpContext.cs" />
+    <Compile Include="HttpMultiPartItem.cs" />
+    <Compile Include="HttpMultiPartRequestParser.cs" />
     <Compile Include="HttpPostedFile.cs" />
     <Compile Include="HttpFileCollection.cs" />
     <Compile Include="HttpOutputStream.cs" />
+    <Compile Include="HttpReadBuffer.cs" />
     <Compile Include="HttpRequest.cs" />
+    <Compile Include="HttpRequestParser.cs" />
     <Compile Include="HttpResponse.cs" />
     <Compile Include="HttpServer.cs" />
     <Compile Include="HttpServerState.cs" />
     <Compile Include="HttpServerUtility.cs" />
+    <Compile Include="HttpUrlEncodedRequestParser.cs" />
     <Compile Include="HttpUtil.cs" />
     <Compile Include="NHttpException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="HttpRequestEventHandler.cs" />
     <Compile Include="ProtocolException.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="HttpClient.Parsers.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="HttpClient.ReadBuffer.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

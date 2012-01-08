@@ -10,19 +10,18 @@ using Common.Logging;
 
 namespace NHttp
 {
-    internal partial class HttpClient : IDisposable
+    internal class HttpClient : IDisposable
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(HttpClient));
 
         private static readonly Regex PrologRegex = new Regex("^(GET|POST) ([^ ]+) (HTTP/[^ ]+)$");
 
         private bool _disposed;
-        private readonly ReadBuffer _readBuffer;
         private readonly byte[] _writeBuffer;
         private NetworkStream _stream;
         private ClientState _state;
         private MemoryStream _writeStream;
-        private RequestParser _parser;
+        private HttpRequestParser _parser;
         private HttpContext _context;
 
         public HttpServer Server { get; private set; }
@@ -37,9 +36,11 @@ namespace NHttp
 
         public Dictionary<string, string> Headers { get; private set; }
 
-        public Dictionary<string, string> PostParameters { get; private set; }
+        public Dictionary<string, string> PostParameters { get; set; }
 
-        public List<MultiPartItem> MultiPartItems { get; private set; }
+        public List<HttpMultiPartItem> MultiPartItems { get; set; }
+
+        public HttpReadBuffer ReadBuffer { get; private set; }
 
         public HttpClient(HttpServer server, TcpClient client)
         {
@@ -51,7 +52,7 @@ namespace NHttp
             Server = server;
             TcpClient = client;
 
-            _readBuffer = new ReadBuffer(server.ReadBufferSize);
+            ReadBuffer = new HttpReadBuffer(server.ReadBufferSize);
             _writeBuffer = new byte[server.WriteBufferSize];
 
             _stream = client.GetStream();
@@ -74,7 +75,7 @@ namespace NHttp
                 _writeStream = null;
             }
 
-            _readBuffer.Reset();
+            ReadBuffer.Reset();
 
             Method = null;
             Protocol = null;
@@ -108,7 +109,7 @@ namespace NHttp
 
             try
             {
-                _readBuffer.BeginRead(_stream, ReadCallback, null);
+                ReadBuffer.BeginRead(_stream, ReadCallback, null);
             }
             catch (Exception ex)
             {
@@ -136,7 +137,7 @@ namespace NHttp
 
             try
             {
-                _readBuffer.EndRead(_stream, asyncResult);
+                ReadBuffer.EndRead(_stream, asyncResult);
 
                 ProcessReadBuffer();
             }
@@ -150,7 +151,7 @@ namespace NHttp
 
         private void ProcessReadBuffer()
         {
-            while (_writeStream == null && _readBuffer.DataAvailable)
+            while (_writeStream == null && ReadBuffer.DataAvailable)
             {
                 switch (_state)
                 {
@@ -174,7 +175,7 @@ namespace NHttp
 
         private void ProcessProlog()
         {
-            string line = _readBuffer.ReadLine();
+            string line = ReadBuffer.ReadLine();
 
             if (line == null)
                 return;
@@ -201,7 +202,7 @@ namespace NHttp
         {
             string line;
 
-            while ((line = _readBuffer.ReadLine()) != null)
+            while ((line = ReadBuffer.ReadLine()) != null)
             {
                 // Have we completed receiving the headers?
 
@@ -209,7 +210,7 @@ namespace NHttp
                 {
                     // Reset the read buffer which resets the bytes read.
 
-                    _readBuffer.Reset();
+                    ReadBuffer.Reset();
 
                     // Start processing the body of the request.
 
@@ -306,7 +307,7 @@ namespace NHttp
                 switch (parts[0].ToLowerInvariant())
                 {
                     case "application/x-www-form-urlencoded":
-                        _parser = new UrlEncodedParser(this, contentLength);
+                        _parser = new HttpUrlEncodedRequestParser(this, contentLength);
                         break;
 
                     case "multipart/form-data":
@@ -326,7 +327,7 @@ namespace NHttp
                         if (boundary == null)
                             throw new ProtocolException("Expected boundary with multipart content type");
 
-                        _parser = new MultiPartParser(this, contentLength, parts[1]);
+                        _parser = new HttpMultiPartRequestParser(this, contentLength, parts[1]);
                         break;
 
                     default:
@@ -420,7 +421,7 @@ namespace NHttp
                         default:
                             Debug.Assert(_state != ClientState.Closed);
 
-                            if (_readBuffer.DataAvailable)
+                            if (ReadBuffer.DataAvailable)
                                 ProcessReadBuffer();
                             else
                                 BeginRead();
@@ -436,7 +437,7 @@ namespace NHttp
             }
         }
 
-        private void ExecuteRequest()
+        public void ExecuteRequest()
         {
             _context = new HttpContext(this);
 
@@ -570,6 +571,13 @@ namespace NHttp
 
             if (stream != null)
                 stream.Dispose();
+        }
+
+        public void UnsetParser()
+        {
+            Debug.Assert(_parser != null);
+
+            _parser = null;
         }
 
         public void Dispose()
