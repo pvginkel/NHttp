@@ -50,6 +50,7 @@
     <Compile Include="NHttpException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="HttpRequestEventHandler.cs" />
+    <Compile Include="ProtocolException.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="HttpClient.Parsers.cs" />

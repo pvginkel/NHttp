@@ -141,17 +141,11 @@ namespace NHttp
                 if (atBoundary.HasValue)
                 {
                     if (!atBoundary.Value)
-                    {
-                        Log.Warn("Expected multipart content to start with the boundary");
+                        throw new ProtocolException("Expected multipart content to start with the boundary");
 
-                        Client._state = ClientState.Closed;
-                    }
-                    else
-                    {
-                        _state = ParserState.ReadingHeaders;
+                    _state = ParserState.ReadingHeaders;
 
-                        ParseHeaders();
-                    }
+                    ParseHeaders();
                 }
             }
 
@@ -170,12 +164,7 @@ namespace NHttp
                         string contentDispositionHeader;
 
                         if (!_headers.TryGetValue("Content-Disposition", out contentDispositionHeader))
-                        {
-                            Log.Warn("Expected Content-Disposition header with multipart");
-
-                            Client._state = ClientState.Closed;
-                            return;
-                        }
+                            throw new ProtocolException("Expected Content-Disposition header with multipart");
 
                         parts = contentDispositionHeader.Split(';');
 
@@ -222,12 +211,7 @@ namespace NHttp
                     parts = line.Split(new[] { ':' }, 2);
 
                     if (parts.Length != 2)
-                    {
-                        Log.Warn("Received header without colon");
-
-                        Client._state = ClientState.Closed;
-                        return;
-                    }
+                        throw new ProtocolException("Received header without colon");
 
                     _headers[parts[0].Trim()] = parts[1].Trim();
                 }
@@ -288,16 +272,10 @@ namespace NHttp
 
                         Debug.Assert(atEnd.HasValue);
 
-                        if (atEnd.Value)
-                        {
-                            EndParsing();
-                        }
-                        else
-                        {
-                            Log.Warn("Unexpected content after boundary");
+                        if (!atEnd.Value)
+                            throw new ProtocolException("Unexpected content after boundary");
 
-                            Client._state = ClientState.Closed;
-                        }
+                        EndParsing();
                     }
                 }
             }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
@@ -111,7 +112,7 @@ namespace NHttp
             }
             catch (Exception ex)
             {
-                Log.Warn("Failed to read", ex);
+                Log.Warn("BeginRead failed", ex);
 
                 Dispose();
             }
@@ -138,38 +139,26 @@ namespace NHttp
 
         private void ProcessReadBuffer()
         {
-            switch (_state)
+            while (_writeStream == null && _readBuffer.DataAvailable)
             {
-                case ClientState.ReadingProlog:
-                    ProcessProlog();
-                    break;
+                switch (_state)
+                {
+                    case ClientState.ReadingProlog:
+                        ProcessProlog();
+                        break;
 
-                case ClientState.ReadingHeaders:
-                    ProcessHeaders();
-                    break;
+                    case ClientState.ReadingHeaders:
+                        ProcessHeaders();
+                        break;
 
-                case ClientState.ReadingContent:
-                    ProcessContent();
-                    break;
+                    case ClientState.ReadingContent:
+                        ProcessContent();
+                        break;
+                }
             }
 
-            if (_state == ClientState.Closed)
-            {
-                Dispose();
-            }
-            else if (_writeStream != null)
-            {
-                // If we have a write stream, we're writing.
-                return;
-            }
-            else if (_readBuffer.DataAvailable)
-            {
-                ProcessReadBuffer();
-            }
-            else
-            {
+            if (_writeStream == null)
                 BeginRead();
-            }
         }
 
         private void ProcessProlog()
@@ -184,12 +173,7 @@ namespace NHttp
             var match = PrologRegex.Match(line);
 
             if (!match.Success)
-            {
-                Log.Debug(String.Format("Could not parse prolog '{0}'", line));
-
-                _state = ClientState.Closed;
-                return;
-            }
+                throw new ProtocolException(String.Format("Could not parse prolog '{0}'", line));
 
             Method = match.Groups[1].Value;
             Request = match.Groups[2].Value;
@@ -228,16 +212,9 @@ namespace NHttp
                 string[] parts = line.Split(new[] { ':' }, 2);
 
                 if (parts.Length != 2)
-                {
-                    Log.Warn("Received header without colon");
+                    throw new ProtocolException("Received header without colon");
 
-                    _state = ClientState.Closed;
-                    return;
-                }
-                else
-                {
-                    Headers[parts[0].Trim()] = parts[1].Trim();
-                }
+                Headers[parts[0].Trim()] = parts[1].Trim();
             }
         }
 
@@ -278,12 +255,7 @@ namespace NHttp
                     expectHeader = expectHeader.Substring(0, pos).Trim();
 
                 if (!String.Equals("100-continue", expectHeader, StringComparison.OrdinalIgnoreCase))
-                {
-                    Log.Warn(String.Format("Could not process Expect header '{0}'", expectHeader));
-
-                    _state = ClientState.Closed;
-                    return true;
-                }
+                    throw new ProtocolException(String.Format("Could not process Expect header '{0}'", expectHeader));
 
                 SendContinueResponse();
                 return true;
@@ -303,22 +275,12 @@ namespace NHttp
                 int contentLength;
 
                 if (!int.TryParse(contentLengthHeader, out contentLength))
-                {
-                    Log.Warn(String.Format("Could not parse Content-Length header '{0}'", contentLengthHeader));
-
-                    _state = ClientState.Closed;
-                    return true;
-                }
+                    throw new ProtocolException(String.Format("Could not parse Content-Length header '{0}'", contentLengthHeader));
 
                 string contentTypeHeader;
 
                 if (!Headers.TryGetValue("Content-Type", out contentTypeHeader))
-                {
-                    Log.Warn("Expected Content-Type header with Content-Length header");
-
-                    _state = ClientState.Closed;
-                    return true;
-                }
+                    throw new ProtocolException("Expected Content-Type header with Content-Length header");
 
                 string[] parts = contentTypeHeader.Split(new[] { ';' }, 2);
 
@@ -337,6 +299,8 @@ namespace NHttp
                         break;
 
                     case "multipart/form-data":
+                        string boundary = null;
+
                         if (parts.Length == 2)
                         {
                             parts = parts[1].Split(new[] { '=' }, 2);
@@ -345,19 +309,17 @@ namespace NHttp
                                 parts.Length == 2 &&
                                 String.Equals(parts[0], "boundary", StringComparison.OrdinalIgnoreCase)
                             )
-                                _parser = new MultiPartParser(this, contentLength, parts[1]);
+                                boundary = parts[1];
                         }
 
-                        if (_parser == null)
-                            _state = ClientState.Closed;
+                        if (boundary == null)
+                            throw new ProtocolException("Expected boundary with multipart content type");
 
+                        _parser = new MultiPartParser(this, contentLength, parts[1]);
                         break;
 
                     default:
-                        Log.Warn(String.Format("Could not process Content-Type header '{0}'", contentTypeHeader));
-
-                        _state = ClientState.Closed;
-                        return true;
+                        throw new ProtocolException(String.Format("Could not process Content-Type header '{0}'", contentTypeHeader));
                 }
 
                 // We've made a parser available. Recurs back to start processing
@@ -405,7 +367,7 @@ namespace NHttp
             }
             catch (Exception ex)
             {
-                Log.Warn("Failed to write", ex);
+                Log.Warn("BeginWrite failed", ex);
 
                 Dispose();
             }
@@ -422,14 +384,17 @@ namespace NHttp
 
                 if (_writeStream != null && _writeStream.Length != _writeStream.Position)
                 {
+                    // Continue writing from the write stream.
+
                     BeginWrite();
                 }
                 else
                 {
                     if (_writeStream != null)
+                    {
                         _writeStream.Dispose();
-
-                    _writeStream = null;
+                        _writeStream = null;
+                    }
 
                     switch (_state)
                     {
@@ -441,10 +406,9 @@ namespace NHttp
                             ProcessRequestCompleted();
                             break;
 
-                        case ClientState.Closed:
-                            return;
-
                         default:
+                            Debug.Assert(_state != ClientState.Closed);
+
                             if (_readBuffer.DataAvailable)
                                 ProcessReadBuffer();
                             else
