@@ -87,13 +87,13 @@ namespace NHttp
         private class MultiPartParser : RequestParser
         {
             private static readonly ILog Log = LogManager.GetLogger(typeof(MultiPartParser));
+            private static readonly byte[] MoreBoundary = Encoding.ASCII.GetBytes("\r\n");
+            private static readonly byte[] EndBoundary = Encoding.ASCII.GetBytes("--");
 
             private Dictionary<string, string> _headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             private ParserState _state = ParserState.BeforeFirstHeaders;
             private readonly byte[] _firstBoundary;
             private readonly byte[] _separatorBoundary;
-            private readonly byte[] _moreBoundary;
-            private readonly byte[] _endBoundary;
             private bool _readingFile;
             private MemoryStream _fieldStream;
             private Stream _fileStream;
@@ -108,8 +108,6 @@ namespace NHttp
 
                 _firstBoundary = Encoding.ASCII.GetBytes("--" + boundary + "\r\n");
                 _separatorBoundary = Encoding.ASCII.GetBytes("\r\n--" + boundary);
-                _moreBoundary = Encoding.ASCII.GetBytes("\r\n");
-                _endBoundary = Encoding.ASCII.GetBytes("--");
 
                 Client.MultiPartItems = new List<MultiPartItem>();
             }
@@ -272,7 +270,7 @@ namespace NHttp
 
             private void ParseBoundary()
             {
-                bool? atMore = Client._readBuffer.AtBoundary(_moreBoundary);
+                bool? atMore = Client._readBuffer.AtBoundary(MoreBoundary);
 
                 if (atMore.HasValue)
                 {
@@ -284,7 +282,7 @@ namespace NHttp
                     }
                     else
                     {
-                        bool? atEnd = Client._readBuffer.AtBoundary(_endBoundary);
+                        bool? atEnd = Client._readBuffer.AtBoundary(EndBoundary);
 
                         // The more and end boundaries have the same length.
 
