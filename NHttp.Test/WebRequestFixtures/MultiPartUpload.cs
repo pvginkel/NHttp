@@ -39,12 +39,7 @@ namespace NHttp.Test.WebRequestFixtures
                     writer.WriteValue("key", "value");
                 }
 
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream))
-                {
-                    reader.ReadToEnd();
-                }
+                GetResponseFromRequest(request);
             }
         }
 
@@ -83,12 +78,7 @@ namespace NHttp.Test.WebRequestFixtures
                     writer.WriteFile("file", "filename", "application/octet-stream", uploadStream);
                 }
 
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream))
-                {
-                    reader.ReadToEnd();
-                }
+                GetResponseFromRequest(request);
             }
         }
 
@@ -127,12 +117,7 @@ namespace NHttp.Test.WebRequestFixtures
                     writer.WriteFile("file", "filename", "application/octet-stream", uploadStream);
                 }
 
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream))
-                {
-                    reader.ReadToEnd();
-                }
+                GetResponseFromRequest(request);
             }
         }
     }

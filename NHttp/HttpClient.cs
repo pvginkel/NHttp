@@ -23,6 +23,7 @@ namespace NHttp
         private MemoryStream _writeStream;
         private HttpRequestParser _parser;
         private HttpContext _context;
+        private bool _errored;
 
         public HttpServer Server { get; private set; }
 
@@ -153,7 +154,7 @@ namespace NHttp
             {
                 Log.Warn("Failed to read from the HTTP connection", ex);
 
-                Dispose();
+                ProcessException(ex);
             }
         }
 
@@ -174,6 +175,9 @@ namespace NHttp
                     case ClientState.ReadingContent:
                         ProcessContent();
                         break;
+
+                    default:
+                        throw new InvalidOperationException("Invalid state");
                 }
             }
 
@@ -298,13 +302,16 @@ namespace NHttp
                     throw new ProtocolException(String.Format("Could not parse Content-Length header '{0}'", contentLengthHeader));
 
                 string contentTypeHeader;
+                string contentType = null;
+                string contentTypeExtra = null;
 
-                if (!Headers.TryGetValue("Content-Type", out contentTypeHeader))
-                    throw new ProtocolException("Expected Content-Type header with Content-Length header");
+                if (Headers.TryGetValue("Content-Type", out contentTypeHeader))
+                {
+                    string[] parts = contentTypeHeader.Split(new[] { ';' }, 2);
 
-                string[] parts = contentTypeHeader.Split(new[] { ';' }, 2);
-
-                HttpUtil.TrimAll(parts);
+                    contentType = parts[0].Trim().ToLowerInvariant();
+                    contentTypeExtra = parts.Length == 2 ? parts[1].Trim() : null;
+                }
 
                 if (_parser != null)
                 {
@@ -312,7 +319,7 @@ namespace NHttp
                     _parser = null;
                 }
 
-                switch (parts[0].ToLowerInvariant())
+                switch (contentType)
                 {
                     case "application/x-www-form-urlencoded":
                         _parser = new HttpUrlEncodedRequestParser(this, contentLength);
@@ -321,9 +328,9 @@ namespace NHttp
                     case "multipart/form-data":
                         string boundary = null;
 
-                        if (parts.Length == 2)
+                        if (contentTypeExtra != null)
                         {
-                            parts = parts[1].Split(new[] { '=' }, 2);
+                            string[] parts = contentTypeExtra.Split(new[] { '=' }, 2);
 
                             if (
                                 parts.Length == 2 &&
@@ -335,7 +342,7 @@ namespace NHttp
                         if (boundary == null)
                             throw new ProtocolException("Expected boundary with multipart content type");
 
-                        _parser = new HttpMultiPartRequestParser(this, contentLength, parts[1]);
+                        _parser = new HttpMultiPartRequestParser(this, contentLength, boundary);
                         break;
 
                     default:
@@ -431,9 +438,20 @@ namespace NHttp
                             Debug.Assert(_state != ClientState.Closed);
 
                             if (ReadBuffer.DataAvailable)
-                                ProcessReadBuffer();
+                            {
+                                try
+                                {
+                                    ProcessReadBuffer();
+                                }
+                                catch (Exception ex)
+                                {
+                                    ProcessException(ex);
+                                }
+                            }
                             else
+                            {
                                 BeginRead();
+                            }
                             break;
                     }
                 }
@@ -554,6 +572,7 @@ namespace NHttp
             // Do not accept new requests when the server is stopping.
 
             if (
+                !_errored &&
                 Server.State == HttpServerState.Started &&
                 Headers.TryGetValue("Connection", out connectionHeader) &&
                 String.Equals(connectionHeader, "keep-alive", StringComparison.OrdinalIgnoreCase)
@@ -587,6 +606,45 @@ namespace NHttp
             Debug.Assert(_parser != null);
 
             _parser = null;
+        }
+
+        private void ProcessException(Exception ex)
+        {
+            _errored = true;
+
+            if (_context == null)
+                _context = new HttpContext(this);
+
+            _context.Response.Status = "500 Internal Server Error";
+
+            bool handled;
+
+            try
+            {
+                handled = Server.RaiseUnhandledException(_context, ex);
+            }
+            catch
+            {
+                handled = false;
+            }
+
+            if (!handled && _context.Response.OutputStream.CanWrite)
+            {
+                string resourceName = GetType().Namespace + ".Resources.InternalServerError.html";
+
+                using (var stream = GetType().Assembly.GetManifestResourceStream(resourceName))
+                {
+                    byte[] buffer = new byte[4096];
+                    int read;
+
+                    while ((read = stream.Read(buffer, 0, buffer.Length)) != 0)
+                    {
+                        _context.Response.OutputStream.Write(buffer, 0, read);
+                    }
+                }
+            }
+
+            WriteResponseHeaders();
         }
 
         public void Dispose()

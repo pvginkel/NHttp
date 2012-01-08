@@ -4,7 +4,7 @@ using System.Text;
 
 namespace NHttp
 {
-    public sealed class HttpRequestEventArgs : EventArgs
+    public class HttpRequestEventArgs : EventArgs
     {
         public HttpRequestEventArgs(HttpContext context)
         {

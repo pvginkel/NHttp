@@ -38,12 +38,7 @@ namespace NHttp.Test.WebRequestFixtures
                         String.Format("http://{0}/", server.EndPoint)
                     );
 
-                    using (var response = request.GetResponse())
-                    using (var stream = response.GetResponseStream())
-                    using (var reader = new StreamReader(stream))
-                    {
-                        Assert.AreEqual(Payload, reader.ReadToEnd());
-                    }
+                    Assert.AreEqual(Payload, GetResponseFromRequest(request));
                 }
             }
         }
@@ -101,12 +96,7 @@ namespace NHttp.Test.WebRequestFixtures
                                 String.Format("http://{0}/", server.EndPoint)
                             );
 
-                            using (var response = request.GetResponse())
-                            using (var stream = response.GetResponseStream())
-                            using (var reader = new StreamReader(stream))
-                            {
-                                Assert.AreEqual(Payload, reader.ReadToEnd());
-                            }
+                            Assert.AreEqual(Payload, GetResponseFromRequest(request));
                         }
 
                         lock (syncLock)

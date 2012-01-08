@@ -50,12 +50,7 @@ namespace NHttp.Test.WebRequestFixtures
                     stream.Write(postBytes, 0, postBytes.Length);
                 }
 
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream))
-                {
-                    Assert.AreEqual(ResponseText, reader.ReadToEnd());
-                }
+                Assert.AreEqual(ResponseText, GetResponseFromRequest(request));
             }
         }
 
@@ -94,12 +89,66 @@ namespace NHttp.Test.WebRequestFixtures
                     uploadStream.CopyTo(stream);
                 }
 
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream))
+                GetResponseFromRequest(request);
+            }
+        }
+
+        [Test]
+        public void PostWithoutContent()
+        {
+            using (var server = new HttpServer())
+            {
+                server.RequestReceived += (s, e) =>
                 {
-                    reader.ReadToEnd();
+                    Assert.AreEqual("POST", e.Request.HttpMethod);
+                };
+
+                server.Start();
+
+                var request = (HttpWebRequest)WebRequest.Create(
+                    String.Format("http://{0}/", server.EndPoint)
+                );
+
+                request.Method = "POST";
+
+                GetResponseFromRequest(request);
+            }
+        }
+
+        [Test]
+        public void PostWithContentWithoutType()
+        {
+            using (var server = new HttpServer())
+            using (var uploadStream = new MemoryStream())
+            {
+                WriteRandomData(uploadStream, 1 * 1024 * 1024);
+
+                server.RequestReceived += (s, e) =>
+                {
+                    uploadStream.Position = 0;
+
+                    Assert.AreEqual("POST", e.Request.HttpMethod);
+                    Assert.AreEqual(uploadStream, e.Request.InputStream);
+                    Assert.IsNull(e.Request.ContentType);
+                };
+
+                server.Start();
+
+                var request = (HttpWebRequest)WebRequest.Create(
+                    String.Format("http://{0}/", server.EndPoint)
+                );
+
+                uploadStream.Position = 0;
+
+                request.Method = "POST";
+                request.ContentLength = uploadStream.Length;
+
+                using (var stream = request.GetRequestStream())
+                {
+                    uploadStream.CopyTo(stream);
                 }
+
+                GetResponseFromRequest(request);
             }
         }
     }

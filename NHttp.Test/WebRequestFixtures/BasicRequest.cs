@@ -35,12 +35,24 @@ namespace NHttp.Test.WebRequestFixtures
                     String.Format("http://{0}/?key=value", server.EndPoint)
                 );
 
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream))
-                {
-                    Assert.AreEqual(ResponseText, reader.ReadToEnd());
-                }
+                Assert.AreEqual(ResponseText, GetResponseFromRequest(request));
+            }
+        }
+
+        [Test]
+        public void NoInputStreamWithGet()
+        {
+            using (var server = new HttpServer())
+            {
+                server.RequestReceived += (s, e) => Assert.IsNull(e.Request.InputStream);
+
+                server.Start();
+
+                var request = (HttpWebRequest)WebRequest.Create(
+                    String.Format("http://{0}/", server.EndPoint)
+                );
+
+                GetResponseFromRequest(request);
             }
         }
     }

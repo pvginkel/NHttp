@@ -44,6 +44,16 @@ namespace NHttp
                 ev(this, e);
         }
 
+        public event HttpExceptionEventHandler UnhandledException;
+
+        protected virtual void OnUnhandledException(HttpExceptionEventArgs e)
+        {
+            var ev = UnhandledException;
+
+            if (ev != null)
+                ev(this, e);
+        }
+
         public event EventHandler StateChanged;
 
         protected virtual void OnStateChanged(EventArgs e)
@@ -319,6 +329,18 @@ namespace NHttp
                 throw new ArgumentNullException("context");
 
             OnRequestReceived(new HttpRequestEventArgs(context));
+        }
+
+        internal bool RaiseUnhandledException(HttpContext context, Exception exception)
+        {
+            if (context == null)
+                throw new ArgumentNullException("context");
+
+            var e = new HttpExceptionEventArgs(context, exception);
+
+            OnUnhandledException(e);
+
+            return e.Handled;
         }
     }
 }

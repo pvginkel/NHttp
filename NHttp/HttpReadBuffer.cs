@@ -106,18 +106,7 @@ namespace NHttp
                     }
                 }
 
-                if (boundaryOffset == -1)
-                {
-                    // We can only read up until the boundary length because
-                    // we cannot test what comes after that.
-
-                    toRead -= boundary.Length;
-
-                    // We need to force a new read to get more data.
-
-                    _forceNewRead = true;
-                }
-                else
+                if (boundaryOffset != -1)
                 {
                     // If we have a boundary, we can read up until the boundary offset.
 
@@ -143,14 +132,21 @@ namespace NHttp
                 _offset += boundary.Length;
                 _totalRead += boundary.Length;
             }
+            else if (boundary != null && maximum - _totalRead < boundary.Length)
+            {
+                throw new ProtocolException("Not enough data available for multipart boundary to match");
+            }
 
             return atBoundary;
         }
 
-        public bool? AtBoundary(byte[] boundary)
+        public bool? AtBoundary(byte[] boundary, int maximum)
         {
             if (boundary == null)
                 throw new ArgumentNullException("boundary");
+
+            if (maximum - _totalRead < boundary.Length)
+                throw new ProtocolException("Not enough data available for multipart boundary to match");
 
             if (_available - _offset < boundary.Length)
                 return null;

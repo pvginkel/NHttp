@@ -42,12 +42,7 @@ namespace NHttp.Test.WebRequestFixtures
                     String.Format("http://{0}/", server.EndPoint)
                 );
 
-                using (var response = request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream))
-                {
-                    Console.WriteLine("Response: " + reader.ReadToEnd());
-                }
+                GetResponseFromRequest(request);
             }
         }
     }

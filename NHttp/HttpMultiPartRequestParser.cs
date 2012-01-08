@@ -59,7 +59,7 @@ namespace NHttp
 
         private void ParseFirstHeader()
         {
-            bool? atBoundary = Client.ReadBuffer.AtBoundary(_firstBoundary);
+            bool? atBoundary = Client.ReadBuffer.AtBoundary(_firstBoundary, ContentLength);
 
             if (atBoundary.HasValue)
             {
@@ -177,7 +177,7 @@ namespace NHttp
 
         private void ParseBoundary()
         {
-            bool? atMore = Client.ReadBuffer.AtBoundary(MoreBoundary);
+            bool? atMore = Client.ReadBuffer.AtBoundary(MoreBoundary, ContentLength);
 
             if (atMore.HasValue)
             {
@@ -189,7 +189,7 @@ namespace NHttp
                 }
                 else
                 {
-                    bool? atEnd = Client.ReadBuffer.AtBoundary(EndBoundary);
+                    bool? atEnd = Client.ReadBuffer.AtBoundary(EndBoundary, ContentLength);
 
                     // The more and end boundaries have the same length.
 

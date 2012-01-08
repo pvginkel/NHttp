@@ -71,6 +71,9 @@
     <Compile Include="Support\WebBrowserForm.Designer.cs">
       <DependentUpon>WebBrowserForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="WebRequestFixtures\ProtocolErrors.cs" />
+    <Compile Include="WebRequestFixtures\Redirect.cs" />
+    <Compile Include="WebRequestFixtures\StatusCode.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NHttp\NHttp.csproj">
