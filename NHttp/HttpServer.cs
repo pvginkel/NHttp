@@ -266,7 +266,7 @@ namespace NHttp
             }
             catch (Exception ex)
             {
-                Log.Warn("Failed to accept TCP client", ex);
+                Log.Info("Failed to accept TCP client", ex);
             }
         }
 

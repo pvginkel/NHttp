@@ -122,7 +122,7 @@ namespace NHttp
             }
             catch (Exception ex)
             {
-                Log.Warn("BeginRead failed", ex);
+                Log.Info("BeginRead failed", ex);
 
                 Dispose();
             }
@@ -139,7 +139,8 @@ namespace NHttp
             if (
                 _state == ClientState.ReadingProlog &&
                 Server.State != HttpServerState.Started
-            ) {
+            )
+            {
                 Dispose();
                 return;
             }
@@ -152,7 +153,7 @@ namespace NHttp
             }
             catch (Exception ex)
             {
-                Log.Warn("Failed to read from the HTTP connection", ex);
+                Log.Info("Failed to read from the HTTP connection", ex);
 
                 ProcessException(ex);
             }
@@ -395,7 +396,7 @@ namespace NHttp
             }
             catch (Exception ex)
             {
-                Log.Warn("BeginWrite failed", ex);
+                Log.Info("BeginWrite failed", ex);
 
                 Dispose();
             }
@@ -458,7 +459,7 @@ namespace NHttp
             }
             catch (Exception ex)
             {
-                Log.Warn("Failed to write", ex);
+                Log.Info("Failed to write", ex);
 
                 Dispose();
             }
@@ -613,43 +614,62 @@ namespace NHttp
             _parser = null;
         }
 
-        private void ProcessException(Exception ex)
+        private void ProcessException(Exception exception)
         {
             _errored = true;
 
-            if (_context == null)
-                _context = new HttpContext(this);
+            // If there is no request available, the error didn't occur as part
+            // of a request (e.g. the client closed the connection). Just close
+            // the channel in that case.
 
-            _context.Response.Status = "500 Internal Server Error";
-
-            bool handled;
+            if (Request == null)
+            {
+                Dispose();
+                return;
+            }
 
             try
             {
-                handled = Server.RaiseUnhandledException(_context, ex);
-            }
-            catch
-            {
-                handled = false;
-            }
+                if (_context == null)
+                    _context = new HttpContext(this);
 
-            if (!handled && _context.Response.OutputStream.CanWrite)
-            {
-                string resourceName = GetType().Namespace + ".Resources.InternalServerError.html";
+                _context.Response.Status = "500 Internal Server Error";
 
-                using (var stream = GetType().Assembly.GetManifestResourceStream(resourceName))
+                bool handled;
+
+                try
                 {
-                    byte[] buffer = new byte[4096];
-                    int read;
+                    handled = Server.RaiseUnhandledException(_context, exception);
+                }
+                catch
+                {
+                    handled = false;
+                }
 
-                    while ((read = stream.Read(buffer, 0, buffer.Length)) != 0)
+                if (!handled && _context.Response.OutputStream.CanWrite)
+                {
+                    string resourceName = GetType().Namespace + ".Resources.InternalServerError.html";
+
+                    using (var stream = GetType().Assembly.GetManifestResourceStream(resourceName))
                     {
-                        _context.Response.OutputStream.Write(buffer, 0, read);
+                        byte[] buffer = new byte[4096];
+                        int read;
+
+                        while ((read = stream.Read(buffer, 0, buffer.Length)) != 0)
+                        {
+                            _context.Response.OutputStream.Write(buffer, 0, read);
+                        }
                     }
                 }
-            }
 
-            WriteResponseHeaders();
+                WriteResponseHeaders();
+            }
+            catch (Exception ex)
+            {
+                Log.Info("Failed to process internal server error response", ex);
+
+                Dispose();
+            }
         }
 
         public void Dispose()

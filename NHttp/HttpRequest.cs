@@ -210,7 +210,7 @@ namespace NHttp
 
                 if (name == null)
                 {
-                    Log.Warn("Received multipart item without name");
+                    Log.Info("Received multipart item without name");
                     continue;
                 }
 
