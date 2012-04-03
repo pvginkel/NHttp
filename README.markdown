@@ -2,6 +2,8 @@
 
 LGPL License.
 
+[Download from NuGet](http://nuget.org/packages/NHttp).
+
 ## Introduction
 
 NHttp is a simple asynchronous HTTP server written in C# for the .NET framework.
