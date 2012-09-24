@@ -149,7 +149,10 @@ namespace NHttp
             {
                 ReadBuffer.EndRead(_stream, asyncResult);
 
-                ProcessReadBuffer();
+                if (ReadBuffer.DataAvailable)
+                    ProcessReadBuffer();
+                else
+                    Dispose();
             }
             catch (Exception ex)
             {
