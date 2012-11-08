@@ -71,6 +71,14 @@ namespace NHttp
 
         public static Dictionary<string, string> UrlDecode(string content)
         {
+            return UrlDecode(content, Encoding.UTF8);
+        }
+
+        public static Dictionary<string, string> UrlDecode(string content, Encoding encoding)
+        {
+            if (encoding == null)
+                throw new ArgumentNullException("encoding");
+
             var result = new Dictionary<string, string>();
 
             string[] parts = content.Split('&');
@@ -79,8 +87,8 @@ namespace NHttp
             {
                 string[] item = part.Split(new[] { '=' }, 2);
 
-                string key = UriDecode(item[0]);
-                string value = item.Length == 1 ? "" : UriDecode(item[1]);
+                string key = UriDecode(item[0], encoding);
+                string value = item.Length == 1 ? "" : UriDecode(item[1], encoding);
 
                 result[key] = value;
             }
@@ -90,10 +98,18 @@ namespace NHttp
 
         public static string UriDecode(string value)
         {
+            return UriDecode(value, Encoding.UTF8);
+        }
+
+        public static string UriDecode(string value, Encoding encoding)
+        {
             if (value == null)
                 throw new ArgumentNullException("value");
+            if (encoding == null)
+                throw new ArgumentNullException("encoding");
 
-            var sb = new StringBuilder();
+            byte[] result = new byte[value.Length];
+            int length = 0;
 
             for (int i = 0; i < value.Length; i++)
             {
@@ -102,25 +118,27 @@ namespace NHttp
                     i < value.Length - 2 &&
                     IsHex(value[i + 1]) &&
                     IsHex(value[i + 2])
-                )
-                {
-                    sb.Append(
-                        (char)(HexToInt(value[i + 1]) * 16 + HexToInt(value[i + 2]))
-                    );
+                ) {
+                    result[length++] = (byte)(HexToInt(value[i + 1]) * 16 + HexToInt(value[i + 2]));
 
                     i += 2;
                 }
                 else if (value[i] == '+')
                 {
-                    sb.Append(' ');
+                    result[length++] = (byte)' ';
                 }
                 else
                 {
-                    sb.Append(value[i]);
+                    int c = value[i];
+
+                    if (c > byte.MaxValue)
+                        throw new InvalidOperationException("URI contained unexpected character");
+
+                    result[length++] = (byte)c;
                 }
             }
 
-            return sb.ToString();
+            return encoding.GetString(result, 0, length);
         }
 
         private static bool IsHex(char value)

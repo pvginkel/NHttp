@@ -32,7 +32,15 @@ namespace NHttp
 
         public string UrlDecode(string text)
         {
-            return HttpUtil.UriDecode(text);
+            return UrlDecode(text, Encoding.UTF8);
+        }
+
+        public string UrlDecode(string text, Encoding encoding)
+        {
+            if (encoding == null)
+                throw new ArgumentNullException("encoding");
+
+            return HttpUtil.UriDecode(text, encoding);
         }
     }
 }
