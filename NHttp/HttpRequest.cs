@@ -78,6 +78,9 @@ namespace NHttp
             BuildParams();
 
             InputStream = client.InputStream;
+
+            if (InputStream != null)
+                InputStream.Position = 0;
         }
 
         private void ParseHeaders(HttpClient client)
