@@ -14,7 +14,7 @@ namespace NHttp
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(HttpClient));
 
-        private static readonly Regex PrologRegex = new Regex("^(GET|POST) ([^ ]+) (HTTP/[^ ]+)$");
+        private static readonly Regex PrologRegex = new Regex("^([A-Z]+) ([^ ]+) (HTTP/[^ ]+)$", RegexOptions.Compiled);
 
         private bool _disposed;
         private readonly byte[] _writeBuffer;
