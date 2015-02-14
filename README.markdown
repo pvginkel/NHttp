@@ -71,6 +71,12 @@ the port NHttp should listen on:
 This method can also be used to change the interface the HttpServer should be
 listening to.
 
+## Logging
+
+NHttp does not have a dependency on a logging framework, but uses Common.Logging
+if it's available. To enable logging, add a reference to Common.Logging (the
+version doesn't matter) to your project.
+
 ## Bugs
 
 Bugs should be reported through github at
