@@ -4,7 +4,7 @@ Thumbs.db
 /*Playground*
 /*.docstates
 /*.shfbproj_*
-
 /*.dotCover
 /_ReSharper.*
 *.nupkg
+/packages
