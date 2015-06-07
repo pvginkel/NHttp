@@ -19,7 +19,16 @@ namespace NHttp
 
         static LogManager()
         {
-            var assembly = Assembly.Load("Common.Logging");
+            Assembly assembly = null;
+            try
+            {
+                assembly = Assembly.Load("Common.Logging");
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                // Ignore missing assembly, logging will not be enabled.
+            }
+
             if (assembly == null)
                 return;
 
