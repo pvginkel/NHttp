@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Globalization;
 using System.Text;
 
@@ -69,17 +70,17 @@ namespace NHttp
             }
         }
 
-        public static Dictionary<string, string> UrlDecode(string content)
+        public static void UrlDecodeTo(string content, NameValueCollection target)
         {
-            return UrlDecode(content, Encoding.UTF8);
+            UrlDecodeTo(content, target, Encoding.UTF8);
         }
 
-        public static Dictionary<string, string> UrlDecode(string content, Encoding encoding)
+        public static void UrlDecodeTo(string content, NameValueCollection target, Encoding encoding)
         {
             if (encoding == null)
                 throw new ArgumentNullException("encoding");
-
-            var result = new Dictionary<string, string>();
+            if (target == null)
+                throw new ArgumentNullException("target");
 
             string[] parts = content.Split('&');
 
@@ -90,10 +91,8 @@ namespace NHttp
                 string key = UriDecode(item[0], encoding);
                 string value = item.Length == 1 ? "" : UriDecode(item[1], encoding);
 
-                result[key] = value;
+                target.Add(key, value);
             }
-
-            return result;
         }
 
         public static string UriDecode(string value)
