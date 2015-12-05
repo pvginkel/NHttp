@@ -118,7 +118,10 @@ namespace NHttp
 
             try
             {
-                ReadBuffer.BeginRead(_stream, ReadCallback, null);
+                Server.TimeoutManager.ReadQueue.Add(
+                    ReadBuffer.BeginRead(_stream, ReadCallback, null),
+                    this
+                );
             }
             catch (Exception ex)
             {
@@ -153,6 +156,12 @@ namespace NHttp
                     ProcessReadBuffer();
                 else
                     Dispose();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Log.Info("Failed to read", ex);
+
+                Dispose();
             }
             catch (Exception ex)
             {
@@ -395,7 +404,10 @@ namespace NHttp
 
                 int read = _writeStream.Read(_writeBuffer, 0, _writeBuffer.Length);
 
-                _stream.BeginWrite(_writeBuffer, 0, read, WriteCallback, null);
+                Server.TimeoutManager.WriteQueue.Add(
+                    _stream.BeginWrite(_writeBuffer, 0, read, WriteCallback, null),
+                    this
+                );
             }
             catch (Exception ex)
             {
@@ -619,6 +631,9 @@ namespace NHttp
 
         private void ProcessException(Exception exception)
         {
+            if (_disposed)
+                return;
+
             _errored = true;
 
             // If there is no request available, the error didn't occur as part

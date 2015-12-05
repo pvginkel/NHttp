@@ -163,7 +163,7 @@ namespace NHttp
             return true;
         }
 
-        public void BeginRead(Stream stream, AsyncCallback callback, object state)
+        public IAsyncResult BeginRead(Stream stream, AsyncCallback callback, object state)
         {
             // A new read was requested. Reset the flag.
 
@@ -215,7 +215,7 @@ namespace NHttp
 
             int bufferAvailable = Math.Min(_buffer.Length - _available, _bufferSize);
 
-            stream.BeginRead(_buffer, _available, bufferAvailable, callback, state);
+            return stream.BeginRead(_buffer, _available, bufferAvailable, callback, state);
         }
 
         public void EndRead(Stream stream, IAsyncResult asyncResult)

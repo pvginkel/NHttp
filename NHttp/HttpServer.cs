@@ -71,9 +71,15 @@ namespace NHttp
 
         public string ServerBanner { get; set; }
 
+        public TimeSpan ReadTimeout { get; set; }
+
+        public TimeSpan WriteTimeout { get; set; }
+
         public TimeSpan ShutdownTimeout { get; set; }
 
         internal HttpServerUtility ServerUtility { get; private set; }
+
+        internal HttpTimeoutManager TimeoutManager { get; private set; }
 
         public HttpServer()
         {
@@ -82,6 +88,8 @@ namespace NHttp
             ReadBufferSize = 4096;
             WriteBufferSize = 4096;
             ShutdownTimeout = TimeSpan.FromSeconds(30);
+            ReadTimeout = TimeSpan.FromSeconds(90);
+            WriteTimeout = TimeSpan.FromSeconds(90);
 
             ServerBanner = String.Format("NHttp/{0}", GetType().Assembly.GetName().Version);
         }
@@ -93,6 +101,8 @@ namespace NHttp
             State = HttpServerState.Starting;
 
             Log.Debug(String.Format("Starting HTTP server at {0}", EndPoint));
+
+            TimeoutManager = new HttpTimeoutManager(this);
 
             // Start the listener.
 
@@ -320,6 +330,12 @@ namespace NHttp
                 {
                     ((IDisposable)_clientsChangedEvent).Dispose();
                     _clientsChangedEvent = null;
+                }
+
+                if (TimeoutManager != null)
+                {
+                    TimeoutManager.Dispose();
+                    TimeoutManager = null;
                 }
 
                 _disposed = true;
