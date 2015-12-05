@@ -8,3 +8,4 @@ Thumbs.db
 /_ReSharper.*
 *.nupkg
 /packages
+/.vs

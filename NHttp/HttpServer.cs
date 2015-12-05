@@ -230,17 +230,13 @@ namespace NHttp
 
         private void BeginAcceptTcpClient()
         {
-            if (_state != HttpServerState.Started)
-                return;
-
-            _listener.BeginAcceptTcpClient(AcceptTcpClientCallback, null);
+            var listener = _listener;
+            if (listener != null)
+                listener.BeginAcceptTcpClient(AcceptTcpClientCallback, null);
         }
 
         private void AcceptTcpClientCallback(IAsyncResult asyncResult)
         {
-            if (_state != HttpServerState.Started)
-                return;
-
             try
             {
                 var listener = _listener; // Prevent race condition.
@@ -249,6 +245,14 @@ namespace NHttp
                     return;
 
                 var tcpClient = listener.EndAcceptTcpClient(asyncResult);
+
+                // If we've stopped already, close the TCP client now.
+
+                if (_state != HttpServerState.Started)
+                {
+                    tcpClient.Close();
+                    return;
+                }
 
                 var client = new HttpClient(this, tcpClient);
 
