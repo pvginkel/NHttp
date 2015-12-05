@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -36,7 +37,7 @@ namespace NHttp
 
         public Dictionary<string, string> Headers { get; private set; }
 
-        public Dictionary<string, string> PostParameters { get; set; }
+        public NameValueCollection PostParameters { get; set; }
 
         public List<HttpMultiPartItem> MultiPartItems { get; set; }
 
@@ -89,7 +90,7 @@ namespace NHttp
             Protocol = null;
             Request = null;
             Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            PostParameters = null;
+            PostParameters = new NameValueCollection();
 
             if (MultiPartItems != null)
             {

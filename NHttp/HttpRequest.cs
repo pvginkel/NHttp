@@ -62,7 +62,7 @@ namespace NHttp
         {
             ParseHeaders(client);
 
-            Form = CreateCollection(client.PostParameters);
+            Form = client.PostParameters;
 
             ParseMultiPartItems(client);
 
@@ -246,10 +246,9 @@ namespace NHttp
 
             Path = parts[0];
 
+            QueryString = new NameValueCollection();
             if (parts.Length == 2)
-                QueryString = CreateCollection(HttpUtil.UrlDecode(parts[1]));
-            else
-                QueryString = new NameValueCollection();
+                 HttpUtil.UrlDecodeTo(parts[1], QueryString);
 
             string host;
             string port;

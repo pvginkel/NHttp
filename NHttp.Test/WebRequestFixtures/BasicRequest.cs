@@ -40,6 +40,33 @@ namespace NHttp.Test.WebRequestFixtures
         }
 
         [Test]
+        public void QueryStringKeyWithMultipleValues()
+        {
+            using (var server = new HttpServer())
+            {
+                server.RequestReceived += (s, e) =>
+                {
+                    Assert.That(e.Request.QueryString.AllKeys, Is.EquivalentTo(new[] { "key" }));
+                    Assert.That(e.Request.QueryString.GetValues("key"), Is.EquivalentTo(new[] { "first", "second", "third" }));
+                    Assert.AreEqual(e.Request.QueryString["key"], "first,second,third");
+
+                    using (var writer = new StreamWriter(e.Response.OutputStream))
+                    {
+                        writer.Write(ResponseText);
+                    }
+                };
+
+                server.Start();
+
+                var request = (HttpWebRequest)WebRequest.Create(
+                    String.Format("http://{0}/?key=first&key=second&key=third", server.EndPoint)
+                );
+
+                Assert.AreEqual(ResponseText, GetResponseFromRequest(request));
+            }
+        }
+
+        [Test]
         public void NoInputStreamWithGet()
         {
             using (var server = new HttpServer())
